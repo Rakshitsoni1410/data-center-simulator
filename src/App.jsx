@@ -1,64 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { EMPLOYEES } from "./data/employees";
 import StatsChart from "./components/StatsChart";
+import ServerRack from "./components/ServerRack";
 
-/* ---------------- SERVER RACK ---------------- */
-function ServerRack({ server }) {
-  return (
-    <div
-      className={`relative w-full min-h-[170px] rounded-xl p-3 border shadow-2xl transition-all duration-300 hover:scale-[1.03] ${
-        server.level === 1
-          ? "bg-green-700 shadow-green-500/40"
-          : server.level === 2
-            ? "bg-blue-700 shadow-blue-500/40"
-            : "bg-purple-700 shadow-purple-500/40"
-      }`}
-    >
-      {/* HEADER */}
-      <div className="text-center font-bold text-white mb-2">
-        Server L{server.level}
-      </div>
-
-      {/* SERVER BARS */}
-      <div className="space-y-1">
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            className={`h-3 rounded ${
-              server.level === 1
-                ? "bg-green-400"
-                : server.level === 2
-                  ? "bg-blue-400"
-                  : "bg-purple-400"
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* DATA FLOW */}
-      <div className="mt-2 h-1 bg-gray-900 rounded overflow-hidden">
-        <div className="h-full bg-cyan-400 animate-pulse w-3/4" />
-      </div>
-
-      {/* LEDS */}
-      <div className="flex justify-center gap-1 mt-2">
-        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-        <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
-      </div>
-
-      {/* FAN */}
-      <div className="flex justify-center mt-2">
-        <div className="w-4 h-4 border-2 border-gray-200 rounded-full animate-spin" />
-      </div>
-
-      {/* HEALTH */}
-      <div className="mt-2 text-[10px] text-center text-white">
-        ❤️ {server.health}%
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- MAIN APP ---------------- */
+import { clients as availableClients } from "./data/clients";
+import { SERVER_LEVELS } from "./data/serverLevels";
+import { UPGRADES } from "./data/upgrades";
+import { randomEvents } from "./systems/events";
+import { calculateEconomy } from "./systems/economy";
+import { calculateCooling } from "./systems/cooling";
+import { runCyberAttack } from "./systems/attacks";
+import { useGameLoop } from "./hooks/useGameLoop";
 export default function App() {
   const [servers, setServers] = useState([]);
   const [money, setMoney] = useState(1000);
@@ -66,13 +18,20 @@ export default function App() {
   const [cooling, setCooling] = useState(1);
   const [security, setSecurity] = useState(1);
   const [electricity, setElectricity] = useState(0);
+
+  
+  /* FIXED */
   const [clients, setClients] = useState([]);
+  /* EMPLOYEES */
+  const [employees, setEmployees] = useState([]);
   const [message, setMessage] = useState("");
   const [eventLog, setEventLog] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [gameOver, setGameOver] = useState(false);
-
+  const [darkMode, setDarkMode] = useState(true);
+  const [purchasedUpgrades, setPurchasedUpgrades] = useState([]);
   /* ---------------- REFS ---------------- */
+
   const serversRef = useRef(servers);
   const moneyRef = useRef(money);
   const tempRef = useRef(temperature);
@@ -104,7 +63,27 @@ export default function App() {
     clientsRef.current = clients;
   }, [clients]);
 
-  /* ---------------- SAVE SYSTEM ---------------- */
+/* ---------------- THEME ---------------- */
+
+const bgMain = darkMode
+  ? "bg-gray-900 text-white"
+  : "bg-gray-100 text-black";
+
+const cardTheme = darkMode
+  ? "bg-gray-800"
+  : "bg-white border border-gray-300";
+
+const innerCardTheme = darkMode
+  ? "bg-gray-700 text-white"
+  : "bg-gray-200 text-black";
+
+const sectionTitle = darkMode
+  ? "text-white"
+  : "text-gray-900";
+
+
+  /* ---------------- SAVE ---------------- */
+
   useEffect(() => {
     localStorage.setItem(
       "dc-save",
@@ -119,34 +98,55 @@ export default function App() {
     );
   }, [servers, money, temperature, cooling, security, clients]);
 
-  /* ---------------- CLIENTS ---------------- */
-  const availableClients = useMemo(
-    () => [
-      { name: "StartupX", reward: 50, serversNeeded: 1 },
-      { name: "StreamFlix", reward: 120, serversNeeded: 3 },
-      { name: "GameHost Pro", reward: 250, serversNeeded: 5 },
-      { name: "CloudNet AI", reward: 400, serversNeeded: 6 },
-      { name: "CyberVault", reward: 550, serversNeeded: 8 },
-      { name: "Quantum Hosting", reward: 800, serversNeeded: 10 },
-      { name: "MetaVerse Grid", reward: 1200, serversNeeded: 14 },
-      { name: "Galaxy Compute", reward: 1800, serversNeeded: 18 },
-      { name: "Titan Servers", reward: 2500, serversNeeded: 22 },
-      { name: "Neural Cloud", reward: 3500, serversNeeded: 28 },
-      { name: "Infinity Systems", reward: 5000, serversNeeded: 35 },
-      { name: "HyperCore Labs", reward: 7000, serversNeeded: 42 },
-    ],
-    [],
-  );
+  /* ---------------- CAPACITY ---------------- */
 
+  const totalCapacity = servers.reduce((sum, s) => sum + s.capacity, 0);
+
+  const usedCapacity = clients.reduce((sum, c) => sum + c.bandwidth, 0);
+
+  const freeCapacity = totalCapacity - usedCapacity;
+  /* --add employee-- */
+  const hireEmployee = (employee) => {
+    if (moneyRef.current < employee.salary) {
+      setMessage("❌ Not enough money");
+
+      return;
+    }
+
+    setEmployees((prev) => [...prev, employee]);
+
+    setMoney((p) => p - employee.salary);
+
+    setMessage(`${employee.emoji} Hired ${employee.name}`);
+  };
+
+  const buyUpgrade = (upgrade) => {
+    if (purchasedUpgrades.some((u) => u.id === upgrade.id)) {
+      setMessage("⚠ Upgrade already purchased");
+
+      return;
+    }
+
+    if (moneyRef.current < upgrade.cost) {
+      setMessage("❌ Not enough money");
+
+      return;
+    }
+
+    setMoney((p) => p - upgrade.cost);
+
+    setPurchasedUpgrades((prev) => [...prev, upgrade]);
+
+    setMessage(`${upgrade.emoji} ${upgrade.name} unlocked`);
+  };
   /* ---------------- ADD SERVER ---------------- */
-  const addServer = (level = 1) => {
-    const costs = {
-      1: 100,
-      2: 500,
-      3: 1200,
-    };
 
-    if (moneyRef.current < costs[level]) {
+  const addServer = (level = 1) => {
+    const config = SERVER_LEVELS[level];
+
+    if (!config) return;
+
+    if (moneyRef.current < config.cost) {
       setMessage("❌ Not enough money");
       return;
     }
@@ -157,32 +157,39 @@ export default function App() {
         id: Date.now() + Math.random(),
         level,
         health: 100,
+        capacity: config.capacity,
+        used: 0,
       },
     ]);
 
-    setMoney((p) => p - costs[level]);
+    setMoney((p) => p - config.cost);
 
     setMessage(`✅ Level ${level} Server Purchased`);
   };
 
   /* ---------------- MERGE ---------------- */
+
   const mergeServers = () => {
     let arr = [...serversRef.current];
 
     for (let i = 0; i < arr.length; i++) {
       for (let j = i + 1; j < arr.length; j++) {
-        if (arr[i].level === arr[j].level && arr[i].level < 3) {
+        if (arr[i].level === arr[j].level && arr[i].level < 6) {
+          const newLevel = arr[i].level + 1;
+
           arr[i] = {
             ...arr[i],
-            level: arr[i].level + 1,
+            level: newLevel,
             health: 100,
+            capacity: SERVER_LEVELS[newLevel].capacity,
           };
 
           arr.splice(j, 1);
 
           setServers(arr);
 
-          setMessage("🔗 Servers Merged Successfully!");
+          setMessage(`🔗 Level ${newLevel} Server Created!`);
+
           return;
         }
       }
@@ -192,6 +199,7 @@ export default function App() {
   };
 
   /* ---------------- COOLING ---------------- */
+
   const upgradeCooling = () => {
     if (moneyRef.current < 300) return;
 
@@ -202,6 +210,7 @@ export default function App() {
   };
 
   /* ---------------- SECURITY ---------------- */
+
   const upgradeSecurity = () => {
     if (moneyRef.current < 250) return;
 
@@ -211,15 +220,48 @@ export default function App() {
     setMessage("🛡 Security Upgraded");
   };
 
-  /* ---------------- CLIENT HOST ---------------- */
-  const acceptClient = (client) => {
-    if (clientsRef.current.some((c) => c.name === client.name)) {
-      setMessage("⚠ Client already hosted");
+  /* ---------------- REPAIR ---------------- */
+
+  const repairServers = () => {
+    const damagedServers = serversRef.current.filter((s) => s.health < 100);
+
+    if (damagedServers.length === 0) {
+      setMessage("✅ All servers healthy");
       return;
     }
 
-    if (serversRef.current.length < client.serversNeeded) {
-      setMessage("❌ Not enough servers");
+    const repairCost = damagedServers.length * 150;
+
+    if (moneyRef.current < repairCost) {
+      setMessage("❌ Not enough money for repairs");
+
+      return;
+    }
+
+    setMoney((p) => p - repairCost);
+
+    setServers((prev) =>
+      prev.map((s) => ({
+        ...s,
+        health: 100,
+      })),
+    );
+
+    setMessage(`🔧 Repaired ${damagedServers.length} servers`);
+  };
+
+  /* ---------------- HOST CLIENT ---------------- */
+
+  const acceptClient = (client) => {
+    if (clientsRef.current.some((c) => c.name === client.name)) {
+      setMessage("⚠ Client already hosted");
+
+      return;
+    }
+
+    if (freeCapacity < client.bandwidth) {
+      setMessage("❌ Not enough server capacity");
+
       return;
     }
 
@@ -228,40 +270,41 @@ export default function App() {
     setMessage(`✅ Hosting ${client.name}`);
   };
 
-  /* ---------------- RANDOM EVENTS ---------------- */
+  /* ---------------- EVENTS ---------------- */
+
   const triggerRandomEvent = () => {
-    const events = [
-      {
-        text: "⚡ Power Surge Increased Heat!",
-        action: () => setTemperature((p) => p + 10),
-      },
-      {
-        text: "💰 Investor Funding Received!",
-        action: () => setMoney((p) => p + 1000),
-      },
-      {
-        text: "🛡 Security Patch Installed!",
-        action: () => setSecurity((p) => p + 1),
-      },
-      {
-        text: "❄ Cooling Optimized!",
-        action: () => setCooling((p) => p + 1),
-      },
-      {
-        text: "💥 Hardware Failure!",
-        action: () =>
-          setServers((prev) =>
-            prev.map((s) => ({
-              ...s,
-              health: Math.max(20, s.health - 20),
-            })),
-          ),
-      },
-    ];
+    const random =
+      randomEvents[Math.floor(Math.random() * randomEvents.length)];
 
-    const random = events[Math.floor(Math.random() * events.length)];
+    switch (random.type) {
+      case "heat":
+        setTemperature((p) => p + random.value);
+        break;
 
-    random.action();
+      case "money":
+        setMoney((p) => p + random.value);
+        break;
+
+      case "security":
+        setSecurity((p) => p + random.value);
+        break;
+
+      case "cooling":
+        setCooling((p) => p + random.value);
+        break;
+
+      case "damage":
+        setServers((prev) =>
+          prev.map((s) => ({
+            ...s,
+            health: Math.max(20, s.health - random.value),
+          })),
+        );
+        break;
+
+      default:
+        break;
+    }
 
     setEventLog((prev) => [
       {
@@ -275,88 +318,134 @@ export default function App() {
   };
 
   /* ---------------- GAME LOOP ---------------- */
-  useEffect(() => {
-    if (gameOver) return;
+  const engineerCount = employees.filter((e) => e.effect === "repair").length;
 
-    const interval = setInterval(() => {
+  const coolingBonus = employees.filter((e) => e.effect === "cooling").length;
+
+  const securityBonus = employees.filter((e) => e.effect === "security").length;
+  useGameLoop(
+    () => {
       const servers = serversRef.current;
       const money = moneyRef.current;
       const temp = tempRef.current;
       const cooling = coolingRef.current;
       const security = securityRef.current;
       const clients = clientsRef.current;
+      const coolingUpgrade = purchasedUpgrades.find(
+        (u) => u.effect === "cooling",
+      );
 
-      const load = servers.reduce((sum, s) => sum + s.level, 0);
+      const repairUpgrade = purchasedUpgrades.find(
+        (u) => u.effect === "repair",
+      );
 
-      let income = load * 15;
-      let heat = load * 0.8;
-      let power = load * 5;
+      const electricityUpgrade = purchasedUpgrades.find(
+        (u) => u.effect === "electricity",
+      );
 
-      clients.forEach((c) => {
-        income += c.reward;
+      /* REMOVE DEAD SERVERS */
+
+      setServers((prev) => prev.filter((s) => s.health > 0));
+
+      /* ECONOMY */
+
+      const { income, electricity, electricBill, nextTemperature, load } =
+        calculateEconomy({
+          servers,
+          clients,
+          cooling: (cooling + coolingBonus) * (coolingUpgrade?.value || 1),
+          temperature: temp,
+        });
+
+      /* COOLING */
+
+      const { finalTemperature, usageRatio } = calculateCooling({
+        nextTemperature,
+        cooling,
+        usedCapacity,
+        totalCapacity,
       });
 
-      /* CYBER ATTACK */
-      if (Math.random() < 0.08) {
-        const damage = Math.max(50 - security * 10, 5);
+      /* ATTACKS */
 
-        setMoney((p) => p - damage);
-        setTemperature((p) => p + 5);
+      runCyberAttack({
+        security: security + securityBonus,
+        setMoney,
+        setTemperature,
+        setMessage,
+      });
 
-        setMessage("⚠ Cyber Attack Detected!");
-      }
+      /* MONEY */
 
-      /* OVERLOAD */
-      if (load > 15) {
-        heat *= 1.4;
-        setMessage("⚠ Servers Overloaded!");
-      }
+      const reducedBill = electricBill * (electricityUpgrade?.value || 1);
 
-      /* ELECTRIC BILL */
-      const bill = power * 0.5;
-
-      const nextMoney = money + income - bill;
-
-      const nextTemp = Math.max(20, temp + heat * 0.2 - cooling * 2);
-
+      const nextMoney = money + income - reducedBill;
       setMoney(nextMoney);
-      setTemperature(nextTemp);
-      setElectricity(power);
 
-      /* SERVER DAMAGE */
+      /* TEMP */
+
+      setTemperature(finalTemperature);
+
+      /* ELECTRICITY */
+
+      setElectricity(electricity);
+
+      /* DAMAGE */
+
       setServers((prev) =>
         prev.map((s) => ({
           ...s,
-          health: Math.max(0, s.health - (nextTemp > 70 ? 2 : 0)),
+          health: Math.max(0, s.health - (finalTemperature > 70 ? 2 : 0)),
         })),
       );
 
+      /* AUTO REPAIR */
+
+      if (engineerCount > 0) {
+        setServers((prev) =>
+          prev.map((s) => ({
+            ...s,
+            health: Math.min(
+              100,
+              s.health + engineerCount * 0.3 * (repairUpgrade?.value || 1),
+            ),
+          })),
+        );
+      }
+
       /* CHART */
+
       setChartData((prev) => [
         ...prev.slice(-20),
         {
           time: new Date().toLocaleTimeString(),
           money: nextMoney,
-          temperature: nextTemp,
+          temperature: finalTemperature,
         },
       ]);
 
-      /* RANDOM EVENTS */
+      /* EVENTS */
+
       if (Math.random() < 0.05) {
         triggerRandomEvent();
       }
 
       /* GAME OVER */
-      if (nextTemp >= 100) {
+
+      if (finalTemperature >= 100) {
         setGameOver(true);
+
         setMessage("💥 DATA CENTER FAILED 💥");
       }
-    }, 1000);
+    },
+    1000,
+    !gameOver,
+  );
 
-    return () => clearInterval(interval);
-  }, [gameOver]);
+  const load = servers.reduce((sum, s) => sum + s.level, 0);
 
   /* ---------------- GAME OVER ---------------- */
+
   if (gameOver) {
     return (
       <div className="h-screen bg-black text-red-500 flex flex-col items-center justify-center p-4">
@@ -367,6 +456,7 @@ export default function App() {
         <button
           onClick={() => {
             localStorage.removeItem("dc-save");
+
             window.location.reload();
           }}
           className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg transition-all"
@@ -377,80 +467,96 @@ export default function App() {
     );
   }
 
-  const load = servers.reduce((sum, s) => sum + s.level, 0);
-
   /* ---------------- UI ---------------- */
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-3 sm:p-4 md:p-6 overflow-x-hidden">
-      {/* HEADER */}
-      <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 md:mb-6 text-center md:text-left">
-        Data Center Simulator 🚀
-      </h1>
-      {/* MESSAGE */}
+    <div
+      className={`min-h-screen p-3 sm:p-4 md:p-6 overflow-x-hidden ${bgMain}`}
+    >
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+          Data Center Simulator 🚀
+        </h1>
+
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg"
+        >
+          {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
+        </button>
+      </div>
+
       {message && (
         <div className="bg-red-600 p-3 rounded-lg mb-4 break-words">
           {message}
         </div>
       )}
-      {/* COOLING PIPES */}
-      <div className="flex gap-2 mb-4">
-        {[...Array(10)].map((_, i) => (
-          <div
-            key={i}
-            className="h-3 flex-1 bg-cyan-400 rounded-full animate-pulse"
-          />
-        ))}
-      </div>
+
+      {/* CONTROLS */}
+
       <div className="grid grid-cols-2 md:flex gap-3 mb-6">
         <button
           onClick={() => addServer(1)}
-          className="w-full md:w-auto bg-green-600 hover:bg-green-700 px-4 py-3 rounded-lg text-sm sm:text-base transition-all"
+          className="w-full md:w-auto bg-green-600 hover:bg-green-700 px-4 py-3 rounded-lg"
         >
-          Basic Server ($100)
+          Basic Server
         </button>
 
         <button
           onClick={() => addServer(2)}
-          className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg text-sm sm:text-base transition-all"
+          className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg"
         >
-          Advanced Server ($500)
+          Advanced Server
         </button>
 
         <button
           onClick={() => addServer(3)}
-          className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 px-4 py-3 rounded-lg text-sm sm:text-base transition-all"
+          className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 px-4 py-3 rounded-lg"
         >
-          Quantum Server ($1200)
+          Quantum Server
         </button>
 
         <button
           onClick={mergeServers}
-          className="w-full md:w-auto bg-yellow-500 hover:bg-yellow-600 px-4 py-3 rounded-lg text-sm sm:text-base transition-all"
+          className="w-full md:w-auto bg-yellow-500 hover:bg-yellow-600 px-4 py-3 rounded-lg"
         >
           Merge 🔗
         </button>
 
         <button
           onClick={upgradeCooling}
-          className="w-full md:w-auto bg-cyan-500 hover:bg-cyan-600 px-4 py-3 rounded-lg text-sm sm:text-base transition-all"
+          className="w-full md:w-auto bg-cyan-500 hover:bg-cyan-600 px-4 py-3 rounded-lg"
         >
           Cooling ❄
         </button>
 
         <button
           onClick={upgradeSecurity}
-          className="w-full md:w-auto bg-red-600 hover:bg-red-700 px-4 py-3 rounded-lg text-sm sm:text-base transition-all"
+          className="w-full md:w-auto bg-red-600 hover:bg-red-700 px-4 py-3 rounded-lg"
         >
           Security 🛡
         </button>
-      </div>{" "}
-      {/* CONTROLS */}
+
+        <button
+          onClick={repairServers}
+          className="w-full md:w-auto bg-orange-600 hover:bg-orange-700 px-4 py-3 rounded-lg"
+        >
+          Repair 🔧
+        </button>
+      </div>
+
       {/* MAIN GRID */}
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
         {/* SERVER ROOM */}
-        <div className="xl:col-span-2 bg-gray-800 p-4 md:p-6 rounded-xl relative overflow-hidden min-h-[400px]">
+
+        <div
+          className={`xl:col-span-2 ${cardTheme} p-4 md:p-6 rounded-xl relative overflow-hidden min-h-[400px]`}
+        >
           <h2 className="text-xl md:text-2xl mb-4">Server Room</h2>
-          {/* NETWORK CABLES */}
+
+          {/* CABLES */}
+
           <div className="absolute inset-0 pointer-events-none z-0">
             <svg className="w-full h-full">
               {servers.map((_, i) => {
@@ -459,19 +565,13 @@ export default function App() {
                 const col = i % 6;
                 const row = Math.floor(i / 6);
 
-                const x1 = col * 150 - 80;
-                const y1 = row * 190 + 90;
-
-                const x2 = col * 150 + 40;
-                const y2 = row * 190 + 90;
-
                 return (
                   <line
                     key={i}
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
+                    x1={col * 150 - 80}
+                    y1={row * 190 + 90}
+                    x2={col * 150 + 40}
+                    y2={row * 190 + 90}
                     stroke="#00ffff"
                     strokeWidth="4"
                     strokeDasharray="8 6"
@@ -482,7 +582,8 @@ export default function App() {
             </svg>
           </div>
 
-          {/* SERVER GRID */}
+          {/* SERVERS */}
+
           <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
             {servers.map((server) => (
               <ServerRack key={server.id} server={server} />
@@ -491,63 +592,60 @@ export default function App() {
         </div>
 
         {/* DASHBOARD */}
-        <div className="bg-gray-800 p-4 md:p-6 rounded-xl space-y-3 h-fit sticky top-4">
+
+        <div
+  className={`${cardTheme} p-4 md:p-6 rounded-xl space-y-3 h-fit sticky top-4`}
+>
           <h2 className="text-xl md:text-2xl mb-4">Dashboard</h2>
 
           <p>💰 Money: ${money.toFixed(0)}</p>
 
-          <div>
-            <p>🌡 Temperature: {temperature.toFixed(1)}°C</p>
-
-            <div className="w-full bg-gray-700 rounded-full h-3 sm:h-4 mt-2 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  temperature > 70
-                    ? "bg-red-500"
-                    : temperature > 40
-                      ? "bg-yellow-500"
-                      : "bg-green-500"
-                }`}
-                style={{ width: `${temperature}%` }}
-              />
-            </div>
-          </div>
-
-          <p>🖥 Servers: {servers.length}</p>
-          <p>🔌 Load: {load}</p>
-          <p>⚡ Electricity: {electricity}</p>
-          <p>❄ Cooling: {cooling}</p>
-          <p>🛡 Security: {security}</p>
-          <p>🌐 Clients: {clients.length}</p>
-
-          <p className="text-green-400">
-            📈 Revenue/sec: ${clients.reduce((sum, c) => sum + c.reward, 0)}
+          <p>
+            🌡 Temperature:
+            {temperature.toFixed(1)}°C
           </p>
 
-          <p className="text-green-400">🟢 Operational</p>
+          <p>
+            📡 Capacity:
+            {usedCapacity}/{totalCapacity}
+          </p>
+
+          <p>🖥 Servers: {servers.length}</p>
+
+          <p>🔌 Load: {load}</p>
+
+          <p>
+            ⚡ Electricity:
+            {electricity}
+          </p>
+
+          <p>❄ Cooling: {cooling}</p>
+
+          <p>🛡 Security: {security}</p>
+
+          <p>🌐 Clients: {clients.length}</p>
+
+          <p>👨‍🔧 Employees: {employees.length}</p>
         </div>
       </div>
+
       {/* CLIENTS */}
-      <div className="bg-gray-800 p-4 md:p-6 rounded-xl mt-6">
+
+      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
         <h2 className="text-xl md:text-2xl mb-4">Hosting Clients</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {availableClients.map((client, index) => (
-            <div
-              key={index}
-              className="bg-gray-700 p-4 rounded-xl hover:scale-[1.02] transition-all duration-300 break-words"
-            >
+            <div key={index} className={`${innerCardTheme} p-4 rounded-xl`}>
               <p className="font-bold text-lg">{client.name}</p>
 
-              <p className="text-sm text-gray-300">
-                Requires {client.serversNeeded} servers
-              </p>
+              <p>Uses {client.bandwidth} TB</p>
 
-              <p className="text-green-400">+${client.reward}/sec</p>
+              <p>+${client.reward}/sec</p>
 
               <button
                 onClick={() => acceptClient(client)}
-                className="mt-3 bg-purple-600 hover:bg-purple-700 px-4 py-3 rounded-lg w-full transition-all"
+                className="mt-3 bg-purple-600 hover:bg-purple-700 px-4 py-3 rounded-lg w-full"
               >
                 Host Client
               </button>
@@ -555,26 +653,100 @@ export default function App() {
           ))}
         </div>
       </div>
-      {/* EVENT LOG */}
-      <div className="bg-gray-800 p-4 md:p-6 rounded-xl mt-6">
-        <h2 className="text-xl md:text-2xl mb-4">Event Log</h2>
 
-        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-          {eventLog.length === 0 && (
-            <p className="text-gray-400">No recent events</p>
-          )}
+      {/* EMPLOYEES */}
 
-          {eventLog.map((event, index) => (
-            <div key={index} className="bg-gray-700 p-3 rounded-lg break-words">
-              <p>{event.text}</p>
+      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
+        <h2 className="text-xl md:text-2xl mb-4">Employees</h2>
 
-              <p className="text-xs text-gray-400 mt-1">{event.time}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {EMPLOYEES.map((employee) => (
+            <div key={employee.id} className={`${innerCardTheme} p-4 rounded-xl`}>
+              <p className="font-bold text-lg">
+                {employee.emoji} {employee.name}
+              </p>
+
+              <p className="text-gray-300">Salary: ${employee.salary}</p>
+
+              <p className="text-cyan-300 mt-1">Effect: {employee.effect}</p>
+
+              <button
+                onClick={() => hireEmployee(employee)}
+                className="mt-3 bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded-lg w-full transition-all"
+              >
+                Hire
+              </button>
             </div>
           ))}
         </div>
       </div>
+      {/* UPGRADES */}
+
+      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
+        <h2 className="text-2xl mb-4">Upgrade Tree</h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {UPGRADES.map((upgrade) => {
+            const purchased = purchasedUpgrades.some(
+              (u) => u.id === upgrade.id,
+            );
+
+            return (
+              <div
+                key={upgrade.id}
+                className={`p-4 rounded-xl ${
+  purchased
+    ? "bg-green-700 text-white"
+    : innerCardTheme
+}`}
+              >
+                <p className="font-bold text-lg">
+                  {upgrade.emoji} {upgrade.name}
+                </p>
+
+                <p className="text-sm text-gray-300 mt-1">
+                  {upgrade.description}
+                </p>
+
+                <p className="mt-2">💰 ${upgrade.cost}</p>
+
+                <button
+                  disabled={purchased}
+                  onClick={() => buyUpgrade(upgrade)}
+                  className={`mt-3 px-4 py-2 rounded-lg w-full ${
+                    purchased
+                      ? "bg-green-500 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700"
+                  }`}
+                >
+                  {purchased ? "Purchased" : "Buy Upgrade"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* EVENT LOG */}
+
+      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
+        <h2 className="text-xl md:text-2xl mb-4">Event Log</h2>
+
+        <div className="space-y-2">
+          {eventLog.map((event, index) => (
+            <div key={index} className={`${innerCardTheme} p-3 rounded-lg`}>
+              <p>{event.text}</p>
+
+              <p className="text-xs text-gray-400">{event.time}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* CHART */}
-      <div className="mt-6 w-full overflow-x-auto bg-gray-800 p-3 md:p-6 rounded-xl">
+
+      <div
+        className={`${cardTheme} mt-6 w-full overflow-x-auto p-3 md:p-6 rounded-xl`}
+      >
         <StatsChart data={chartData} />
       </div>
     </div>

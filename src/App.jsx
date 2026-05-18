@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { EMPLOYEES } from "./data/employees";
 import StatsChart from "./components/StatsChart";
 import ServerRack from "./components/ServerRack";
-
+import { DATACENTERS } from "./data/datacenters";
 import { clients as availableClients } from "./data/clients";
 import { SERVER_LEVELS } from "./data/serverLevels";
 import { UPGRADES } from "./data/upgrades";
@@ -29,6 +29,8 @@ export default function App() {
   const [gameOver, setGameOver] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [purchasedUpgrades, setPurchasedUpgrades] = useState([]);
+  const [selectedDC, setSelectedDC] = useState(DATACENTERS[0]);
+  const [packets, setPackets] = useState([]);
   /* ---------------- REFS ---------------- */
 
   const serversRef = useRef(servers);
@@ -361,6 +363,33 @@ export default function App() {
   const coolingBonus = employees.filter((e) => e.effect === "cooling").length;
 
   const securityBonus = employees.filter((e) => e.effect === "security").length;
+  /* REMOVE OLD PACKETS */
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPackets((prev) => prev.slice(-30));
+    }, 1000);
+    /* NETWORK PACKETS */
+
+    if (servers.length > 0) {
+      setPackets((prev) => [
+        ...prev.slice(-40),
+
+        {
+          id: Date.now() + Math.random(),
+
+          left: Math.random() * 90,
+
+          top: Math.random() * 80,
+
+          size: Math.random() * 8 + 4,
+
+          speed: Math.random() * 2 + 1,
+        },
+      ]);
+    }
+    return () => clearInterval(interval);
+  }, []);
   useGameLoop(
     () => {
       const servers = serversRef.current;
@@ -380,6 +409,12 @@ export default function App() {
       const electricityUpgrade = purchasedUpgrades.find(
         (u) => u.effect === "electricity",
       );
+      const boostedIncome = income * selectedDC.reward;
+
+      const boostedBill = reducedBill * selectedDC.electricity;
+
+      const nextMoney = money + income - reducedBill;
+      setMoney(nextMoney);
 
       /* REMOVE DEAD SERVERS */
 
@@ -392,7 +427,7 @@ export default function App() {
           servers,
           clients,
           cooling: (cooling + coolingBonus) * (coolingUpgrade?.value || 1),
-          temperature: temp,
+          temperature: temp + selectedDC.temperature * 0.02,
         });
 
       /* COOLING */
@@ -416,9 +451,6 @@ export default function App() {
       /* MONEY */
 
       const reducedBill = electricBill * (electricityUpgrade?.value || 1);
-
-      const nextMoney = money + income - reducedBill;
-      setMoney(nextMoney);
 
       /* TEMP */
 
@@ -618,12 +650,54 @@ export default function App() {
           Reset 🗑
         </button>
       </div>
+      {/* DATACENTER SELECT */}
 
+      <div className={`${cardTheme} p-4 rounded-xl mb-6`}>
+        <h2 className="text-2xl mb-4">Datacenter Region</h2>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {DATACENTERS.map((dc) => (
+            <button
+              key={dc.id}
+              onClick={() => setSelectedDC(dc)}
+              className={`p-4 rounded-xl transition-all ${
+                selectedDC.id === dc.id
+                  ? "bg-cyan-600 scale-105"
+                  : "bg-gray-700 hover:bg-gray-600"
+              }`}
+            >
+              <div className="text-3xl">{dc.emoji}</div>
+
+              <p className="font-bold mt-2">{dc.name}</p>
+
+              <p className="text-sm">⚡ x{dc.electricity}</p>
+
+              <p className="text-sm">💰 x{dc.reward}</p>
+            </button>
+          ))}
+        </div>
+      </div>
       {/* MAIN GRID */}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
         {/* SERVER ROOM */}
+        {/* NETWORK TRAFFIC */}
 
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
+          {packets.map((packet) => (
+            <div
+              key={packet.id}
+              className="absolute rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee] animate-pulse"
+              style={{
+                left: `${packet.left}%`,
+                top: `${packet.top}%`,
+                width: `${packet.size}px`,
+                height: `${packet.size}px`,
+                transition: `all ${packet.speed}s linear`,
+              }}
+            />
+          ))}
+        </div>
         <div
           className={`xl:col-span-2 ${cardTheme} p-4 md:p-6 rounded-xl relative overflow-hidden min-h-[400px]`}
         >
@@ -655,7 +729,7 @@ export default function App() {
               })}
             </svg>
           </div>
-
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
           {/* SERVERS */}
 
           <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">

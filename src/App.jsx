@@ -19,7 +19,6 @@ export default function App() {
   const [security, setSecurity] = useState(1);
   const [electricity, setElectricity] = useState(0);
 
-  
   /* FIXED */
   const [clients, setClients] = useState([]);
   /* EMPLOYEES */
@@ -63,24 +62,19 @@ export default function App() {
     clientsRef.current = clients;
   }, [clients]);
 
-/* ---------------- THEME ---------------- */
+  /* ---------------- THEME ---------------- */
 
-const bgMain = darkMode
-  ? "bg-gray-900 text-white"
-  : "bg-gray-100 text-black";
+  const bgMain = darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black";
 
-const cardTheme = darkMode
-  ? "bg-gray-800"
-  : "bg-white border border-gray-300";
+  const cardTheme = darkMode
+    ? "bg-gray-800"
+    : "bg-white border border-gray-300";
 
-const innerCardTheme = darkMode
-  ? "bg-gray-700 text-white"
-  : "bg-gray-200 text-black";
+  const innerCardTheme = darkMode
+    ? "bg-gray-700 text-white"
+    : "bg-gray-200 text-black";
 
-const sectionTitle = darkMode
-  ? "text-white"
-  : "text-gray-900";
-
+  const sectionTitle = darkMode ? "text-white" : "text-gray-900";
 
   /* ---------------- SAVE ---------------- */
 
@@ -93,11 +87,55 @@ const sectionTitle = darkMode
         temperature,
         cooling,
         security,
+        electricity,
         clients,
+        employees,
+        purchasedUpgrades,
+        darkMode,
+        chartData,
+        eventLog,
       }),
     );
-  }, [servers, money, temperature, cooling, security, clients]);
+  }, [
+    servers,
+    money,
+    temperature,
+    cooling,
+    security,
+    electricity,
+    clients,
+    employees,
+    purchasedUpgrades,
+    darkMode,
+    chartData,
+    eventLog,
+  ]);
+  /* ---------------- LOAD SAVE ---------------- */
 
+  useEffect(() => {
+    const save = JSON.parse(localStorage.getItem("dc-save"));
+
+    if (!save) return;
+
+    setServers(save.servers || []);
+    setMoney(save.money || 1000);
+    setTemperature(save.temperature || 20);
+    setCooling(save.cooling || 1);
+    setSecurity(save.security || 1);
+    setElectricity(save.electricity || 0);
+
+    setClients(save.clients || []);
+    setEmployees(save.employees || []);
+
+    setPurchasedUpgrades(save.purchasedUpgrades || []);
+
+    setDarkMode(save.darkMode ?? true);
+
+    setChartData(save.chartData || []);
+    setEventLog(save.eventLog || []);
+
+    setMessage("💾 Save Loaded");
+  }, []);
   /* ---------------- CAPACITY ---------------- */
 
   const totalCapacity = servers.reduce((sum, s) => sum + s.capacity, 0);
@@ -543,6 +581,42 @@ const sectionTitle = darkMode
         >
           Repair 🔧
         </button>
+        <button
+          onClick={() => {
+            localStorage.setItem(
+              "dc-save",
+              JSON.stringify({
+                servers,
+                money,
+                temperature,
+                cooling,
+                security,
+                electricity,
+                clients,
+                employees,
+                purchasedUpgrades,
+                darkMode,
+                chartData,
+                eventLog,
+              }),
+            );
+
+            setMessage("💾 Game Saved");
+          }}
+          className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg"
+        >
+          Save 💾
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem("dc-save");
+
+            window.location.reload();
+          }}
+          className="w-full md:w-auto bg-gray-700 hover:bg-gray-800 px-4 py-3 rounded-lg"
+        >
+          Reset 🗑
+        </button>
       </div>
 
       {/* MAIN GRID */}
@@ -594,8 +668,8 @@ const sectionTitle = darkMode
         {/* DASHBOARD */}
 
         <div
-  className={`${cardTheme} p-4 md:p-6 rounded-xl space-y-3 h-fit sticky top-4`}
->
+          className={`${cardTheme} p-4 md:p-6 rounded-xl space-y-3 h-fit sticky top-4`}
+        >
           <h2 className="text-xl md:text-2xl mb-4">Dashboard</h2>
 
           <p>💰 Money: ${money.toFixed(0)}</p>
@@ -661,7 +735,10 @@ const sectionTitle = darkMode
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {EMPLOYEES.map((employee) => (
-            <div key={employee.id} className={`${innerCardTheme} p-4 rounded-xl`}>
+            <div
+              key={employee.id}
+              className={`${innerCardTheme} p-4 rounded-xl`}
+            >
               <p className="font-bold text-lg">
                 {employee.emoji} {employee.name}
               </p>
@@ -695,10 +772,8 @@ const sectionTitle = darkMode
               <div
                 key={upgrade.id}
                 className={`p-4 rounded-xl ${
-  purchased
-    ? "bg-green-700 text-white"
-    : innerCardTheme
-}`}
+                  purchased ? "bg-green-700 text-white" : innerCardTheme
+                }`}
               >
                 <p className="font-bold text-lg">
                   {upgrade.emoji} {upgrade.name}

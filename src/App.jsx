@@ -1,902 +1,527 @@
-import { useEffect, useRef, useState } from "react";
-import { EMPLOYEES } from "./data/employees";
-import StatsChart from "./components/StatsChart";
-import ServerRack from "./components/ServerRack";
-import { DATACENTERS } from "./data/datacenters";
-import { clients as availableClients } from "./data/clients";
-import { SERVER_LEVELS } from "./data/serverLevels";
-import { UPGRADES } from "./data/upgrades";
-import { randomEvents } from "./systems/events";
-import { calculateEconomy } from "./systems/economy";
-import { calculateCooling } from "./systems/cooling";
-import { runCyberAttack } from "./systems/attacks";
-import { useGameLoop } from "./hooks/useGameLoop";
-export default function App() {
-  const [servers, setServers] = useState([]);
-  const [money, setMoney] = useState(1000);
-  const [temperature, setTemperature] = useState(20);
-  const [cooling, setCooling] = useState(1);
-  const [security, setSecurity] = useState(1);
-  const [electricity, setElectricity] = useState(0);
+import { useState, useEffect, useRef, useCallback } from "react";
 
-  /* FIXED */
-  const [clients, setClients] = useState([]);
-  /* EMPLOYEES */
-  const [employees, setEmployees] = useState([]);
-  const [message, setMessage] = useState("");
-  const [eventLog, setEventLog] = useState([]);
-  const [chartData, setChartData] = useState([]);
-  const [gameOver, setGameOver] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
-  const [purchasedUpgrades, setPurchasedUpgrades] = useState([]);
-  const [selectedDC, setSelectedDC] = useState(DATACENTERS[0]);
-  const [packets, setPackets] = useState([]);
-  /* ---------------- REFS ---------------- */
+const GRID_COLS = 20;
+const GRID_ROWS = 14;
+const CELL_SIZE = 42;
 
-  const serversRef = useRef(servers);
-  const moneyRef = useRef(money);
-  const tempRef = useRef(temperature);
-  const coolingRef = useRef(cooling);
-  const securityRef = useRef(security);
-  const clientsRef = useRef(clients);
+const COMPONENT_TYPES = {
+  SERVER: {
+    id: "SERVER", label: "Server Rack", icon: "🖥", w: 1, h: 2,
+    color: "#185FA5", heatColor: "#E24B4A", powerDraw: 2.5,
+    desc: "Hosts compute workloads"
+  },
+  SWITCH: {
+    id: "SWITCH", label: "Network Switch", icon: "⇄", w: 2, h: 1,
+    color: "#0F6E56", heatColor: "#EF9F27", powerDraw: 0.8,
+    desc: "Routes network traffic"
+  },
+  STORAGE: {
+    id: "STORAGE", label: "Storage Array", icon: "◫", w: 2, h: 1,
+    color: "#534AB7", heatColor: "#D85A30", powerDraw: 1.2,
+    desc: "Persistent data storage"
+  },
+  COOLING: {
+    id: "COOLING", label: "CRAC Unit", icon: "❄", w: 1, h: 2,
+    color: "#1D9E75", heatColor: "#1D9E75", powerDraw: 3.5,
+    desc: "Cooling / air conditioning"
+  },
+  UPS: {
+    id: "UPS", label: "UPS", icon: "⚡", w: 1, h: 1,
+    color: "#BA7517", heatColor: "#D85A30", powerDraw: 0.3,
+    desc: "Uninterruptible power supply"
+  },
+};
 
-  useEffect(() => {
-    serversRef.current = servers;
-  }, [servers]);
+const TOOLS = ["SELECT", "SERVER", "SWITCH", "STORAGE", "COOLING", "UPS", "DELETE"];
 
-  useEffect(() => {
-    moneyRef.current = money;
-  }, [money]);
+function lerp(a, b, t) { return a + (b - a) * t; }
+function heatToColor(heat) {
+  const r = Math.round(lerp(56, 226, heat));
+  const g = Math.round(lerp(120, 35, heat));
+  const b = Math.round(lerp(200, 35, heat));
+  return `rgb(${r},${g},${b})`;
+}
 
-  useEffect(() => {
-    tempRef.current = temperature;
-  }, [temperature]);
+let nextId = 1;
+function mkId() { return nextId++; }
 
-  useEffect(() => {
-    coolingRef.current = cooling;
-  }, [cooling]);
+const INITIAL_COMPONENTS = [
+  { id: mkId(), type: "SERVER", col: 2, row: 1, load: 0.72, age: 4 },
+  { id: mkId(), type: "SERVER", col: 4, row: 1, load: 0.85, age: 2 },
+  { id: mkId(), type: "SERVER", col: 6, row: 1, load: 0.38, age: 6 },
+  { id: mkId(), type: "SERVER", col: 2, row: 4, load: 0.91, age: 1 },
+  { id: mkId(), type: "SERVER", col: 4, row: 4, load: 0.55, age: 3 },
+  { id: mkId(), type: "SWITCH", col: 2, row: 7, load: 0.45, age: 3 },
+  { id: mkId(), type: "SWITCH", col: 5, row: 7, load: 0.6, age: 2 },
+  { id: mkId(), type: "STORAGE", col: 8, row: 1, load: 0.44, age: 5 },
+  { id: mkId(), type: "STORAGE", col: 8, row: 3, load: 0.71, age: 2 },
+  { id: mkId(), type: "COOLING", col: 12, row: 1, load: 0.9, age: 2 },
+  { id: mkId(), type: "COOLING", col: 12, row: 4, load: 0.78, age: 3 },
+  { id: mkId(), type: "UPS", col: 14, row: 1, load: 0.5, age: 4 },
+  { id: mkId(), type: "UPS", col: 14, row: 3, load: 0.5, age: 4 },
+];
 
-  useEffect(() => {
-    securityRef.current = security;
-  }, [security]);
+function getComponentRect(c) {
+  const t = COMPONENT_TYPES[c.type];
+  return { col: c.col, row: c.row, w: t.w, h: t.h };
+}
 
-  useEffect(() => {
-    clientsRef.current = clients;
-  }, [clients]);
+function collides(a, b) {
+  const ar = getComponentRect(a), br = getComponentRect(b);
+  return !(ar.col + ar.w <= br.col || br.col + br.w <= ar.col ||
+           ar.row + ar.h <= br.row || br.row + br.h <= ar.row);
+}
 
-  /* ---------------- THEME ---------------- */
+function computeHeatMap(components) {
+  const map = {};
+  for (let r = 0; r < GRID_ROWS; r++)
+    for (let c = 0; c < GRID_COLS; c++)
+      map[`${c},${r}`] = 0;
 
-  const bgMain = darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black";
-
-  const cardTheme = darkMode
-    ? "bg-gray-800"
-    : "bg-white border border-gray-300";
-
-  const innerCardTheme = darkMode
-    ? "bg-gray-700 text-white"
-    : "bg-gray-200 text-black";
-
-  const sectionTitle = darkMode ? "text-white" : "text-gray-900";
-
-  /* ---------------- SAVE ---------------- */
-
-  useEffect(() => {
-    localStorage.setItem(
-      "dc-save",
-      JSON.stringify({
-        servers,
-        money,
-        temperature,
-        cooling,
-        security,
-        electricity,
-        clients,
-        employees,
-        purchasedUpgrades,
-        darkMode,
-        chartData,
-        eventLog,
-      }),
-    );
-  }, [
-    servers,
-    money,
-    temperature,
-    cooling,
-    security,
-    electricity,
-    clients,
-    employees,
-    purchasedUpgrades,
-    darkMode,
-    chartData,
-    eventLog,
-  ]);
-  /* ---------------- LOAD SAVE ---------------- */
-
-  useEffect(() => {
-    const save = JSON.parse(localStorage.getItem("dc-save"));
-
-    if (!save) return;
-
-    setServers(save.servers || []);
-    setMoney(save.money || 1000);
-    setTemperature(save.temperature || 20);
-    setCooling(save.cooling || 1);
-    setSecurity(save.security || 1);
-    setElectricity(save.electricity || 0);
-
-    setClients(save.clients || []);
-    setEmployees(save.employees || []);
-
-    setPurchasedUpgrades(save.purchasedUpgrades || []);
-
-    setDarkMode(save.darkMode ?? true);
-
-    setChartData(save.chartData || []);
-    setEventLog(save.eventLog || []);
-
-    setMessage("💾 Save Loaded");
-  }, []);
-  /* ---------------- CAPACITY ---------------- */
-
-  const totalCapacity = servers.reduce((sum, s) => sum + s.capacity, 0);
-
-  const usedCapacity = clients.reduce((sum, c) => sum + c.bandwidth, 0);
-
-  const freeCapacity = totalCapacity - usedCapacity;
-  /* --add employee-- */
-  const hireEmployee = (employee) => {
-    if (moneyRef.current < employee.salary) {
-      setMessage("❌ Not enough money");
-
-      return;
+  components.forEach(comp => {
+    const t = COMPONENT_TYPES[comp.type];
+    const heat = comp.type === "COOLING" ? 0 : comp.load * 0.9;
+    for (let dr = -3; dr <= t.h + 2; dr++) {
+      for (let dc = -3; dc <= t.w + 2; dc++) {
+        const cr = comp.row + dr, cc = comp.col + dc;
+        if (cr < 0 || cr >= GRID_ROWS || cc < 0 || cc >= GRID_COLS) continue;
+        const dist = Math.sqrt(Math.max(0, dr) ** 2 + Math.max(0, dc) ** 2);
+        const spread = heat * Math.max(0, 1 - dist / 4);
+        const key = `${cc},${cr}`;
+        map[key] = Math.min(1, (map[key] || 0) + spread * 0.35);
+      }
     }
-
-    setEmployees((prev) => [...prev, employee]);
-
-    setMoney((p) => p - employee.salary);
-
-    setMessage(`${employee.emoji} Hired ${employee.name}`);
-  };
-
-  const buyUpgrade = (upgrade) => {
-    if (purchasedUpgrades.some((u) => u.id === upgrade.id)) {
-      setMessage("⚠ Upgrade already purchased");
-
-      return;
-    }
-
-    if (moneyRef.current < upgrade.cost) {
-      setMessage("❌ Not enough money");
-
-      return;
-    }
-
-    setMoney((p) => p - upgrade.cost);
-
-    setPurchasedUpgrades((prev) => [...prev, upgrade]);
-
-    setMessage(`${upgrade.emoji} ${upgrade.name} unlocked`);
-  };
-  /* ---------------- ADD SERVER ---------------- */
-
-  const addServer = (level = 1) => {
-    const config = SERVER_LEVELS[level];
-
-    if (!config) return;
-
-    if (moneyRef.current < config.cost) {
-      setMessage("❌ Not enough money");
-      return;
-    }
-
-    setServers((prev) => [
-      ...prev,
-      {
-        id: Date.now() + Math.random(),
-        level,
-        health: 100,
-        capacity: config.capacity,
-        used: 0,
-      },
-    ]);
-
-    setMoney((p) => p - config.cost);
-
-    setMessage(`✅ Level ${level} Server Purchased`);
-  };
-
-  /* ---------------- MERGE ---------------- */
-
-  const mergeServers = () => {
-    let arr = [...serversRef.current];
-
-    for (let i = 0; i < arr.length; i++) {
-      for (let j = i + 1; j < arr.length; j++) {
-        if (arr[i].level === arr[j].level && arr[i].level < 6) {
-          const newLevel = arr[i].level + 1;
-
-          arr[i] = {
-            ...arr[i],
-            level: newLevel,
-            health: 100,
-            capacity: SERVER_LEVELS[newLevel].capacity,
-          };
-
-          arr.splice(j, 1);
-
-          setServers(arr);
-
-          setMessage(`🔗 Level ${newLevel} Server Created!`);
-
-          return;
+    if (comp.type === "COOLING") {
+      for (let dr = -4; dr <= t.h + 3; dr++) {
+        for (let dc = -4; dc <= t.w + 3; dc++) {
+          const cr = comp.row + dr, cc = comp.col + dc;
+          if (cr < 0 || cr >= GRID_ROWS || cc < 0 || cc >= GRID_COLS) continue;
+          const dist = Math.sqrt(Math.max(0, dr) ** 2 + Math.max(0, dc) ** 2);
+          const cool = Math.max(0, 1 - dist / 5) * 0.5;
+          const key = `${cc},${cr}`;
+          map[key] = Math.max(0, (map[key] || 0) - cool);
         }
       }
     }
+  });
+  return map;
+}
 
-    setMessage("⚠ No matching servers found");
-  };
-
-  /* ---------------- COOLING ---------------- */
-
-  const upgradeCooling = () => {
-    if (moneyRef.current < 300) return;
-
-    setCooling((p) => p + 1);
-    setMoney((p) => p - 300);
-
-    setMessage("❄ Cooling Upgraded");
-  };
-
-  /* ---------------- SECURITY ---------------- */
-
-  const upgradeSecurity = () => {
-    if (moneyRef.current < 250) return;
-
-    setSecurity((p) => p + 1);
-    setMoney((p) => p - 250);
-
-    setMessage("🛡 Security Upgraded");
-  };
-
-  /* ---------------- REPAIR ---------------- */
-
-  const repairServers = () => {
-    const damagedServers = serversRef.current.filter((s) => s.health < 100);
-
-    if (damagedServers.length === 0) {
-      setMessage("✅ All servers healthy");
-      return;
-    }
-
-    const repairCost = damagedServers.length * 150;
-
-    if (moneyRef.current < repairCost) {
-      setMessage("❌ Not enough money for repairs");
-
-      return;
-    }
-
-    setMoney((p) => p - repairCost);
-
-    setServers((prev) =>
-      prev.map((s) => ({
-        ...s,
-        health: 100,
-      })),
-    );
-
-    setMessage(`🔧 Repaired ${damagedServers.length} servers`);
-  };
-
-  /* ---------------- HOST CLIENT ---------------- */
-
-  const acceptClient = (client) => {
-    if (clientsRef.current.some((c) => c.name === client.name)) {
-      setMessage("⚠ Client already hosted");
-
-      return;
-    }
-
-    if (freeCapacity < client.bandwidth) {
-      setMessage("❌ Not enough server capacity");
-
-      return;
-    }
-
-    setClients((prev) => [...prev, client]);
-
-    setMessage(`✅ Hosting ${client.name}`);
-  };
-
-  /* ---------------- EVENTS ---------------- */
-
-  const triggerRandomEvent = () => {
-    const random =
-      randomEvents[Math.floor(Math.random() * randomEvents.length)];
-
-    switch (random.type) {
-      case "heat":
-        setTemperature((p) => p + random.value);
-        break;
-
-      case "money":
-        setMoney((p) => p + random.value);
-        break;
-
-      case "security":
-        setSecurity((p) => p + random.value);
-        break;
-
-      case "cooling":
-        setCooling((p) => p + random.value);
-        break;
-
-      case "damage":
-        setServers((prev) =>
-          prev.map((s) => ({
-            ...s,
-            health: Math.max(20, s.health - random.value),
-          })),
-        );
-        break;
-
-      default:
-        break;
-    }
-
-    setEventLog((prev) => [
-      {
-        text: random.text,
-        time: new Date().toLocaleTimeString(),
-      },
-      ...prev.slice(0, 7),
-    ]);
-
-    setMessage(random.text);
-  };
-
-  /* ---------------- GAME LOOP ---------------- */
-  const engineerCount = employees.filter((e) => e.effect === "repair").length;
-
-  const coolingBonus = employees.filter((e) => e.effect === "cooling").length;
-
-  const securityBonus = employees.filter((e) => e.effect === "security").length;
-  /* REMOVE OLD PACKETS */
+export default function DataCenterSimulator() {
+  const [components, setComponents] = useState(INITIAL_COMPONENTS);
+  const [tool, setTool] = useState("SELECT");
+  const [selected, setSelected] = useState(null);
+  const [showHeat, setShowHeat] = useState(true);
+  const [showGrid, setShowGrid] = useState(true);
+  const [heatMap, setHeatMap] = useState({});
+  const [dragging, setDragging] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ dc: 0, dr: 0 });
+  const [simRunning, setSimRunning] = useState(true);
+  const [tick, setTick] = useState(0);
+  const [alert, setAlert] = useState(null);
+  const canvasRef = useRef(null);
+  const animRef = useRef(null);
+  const loadsRef = useRef({});
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPackets((prev) => prev.slice(-30));
-    }, 1000);
-    /* NETWORK PACKETS */
+    const map = computeHeatMap(components);
+    setHeatMap(map);
+  }, [components]);
 
-    if (servers.length > 0) {
-      setPackets((prev) => [
-        ...prev.slice(-40),
+  useEffect(() => {
+    if (!simRunning) return;
+    const id = setInterval(() => {
+      setTick(t => t + 1);
+      setComponents(prev => prev.map(c => {
+        const t = COMPONENT_TYPES[c.type];
+        const noise = (Math.random() - 0.5) * 0.06;
+        const newLoad = Math.max(0.05, Math.min(0.99, c.load + noise));
+        if (newLoad > 0.92 && c.type !== "COOLING") {
+          setAlert(`⚠️ ${t.label} overloaded! Consider adding cooling or load balancing.`);
+          setTimeout(() => setAlert(null), 3000);
+        }
+        return { ...c, load: parseFloat(newLoad.toFixed(3)) };
+      }));
+    }, 1200);
+    return () => clearInterval(id);
+  }, [simRunning]);
 
-        {
-          id: Date.now() + Math.random(),
+  const totalPower = components.reduce((s, c) => s + COMPONENT_TYPES[c.type].powerDraw * c.load, 0);
+  const avgLoad = components.length ? components.reduce((s, c) => s + c.load, 0) / components.length : 0;
+  const serverCount = components.filter(c => c.type === "SERVER").length;
+  const coolingCount = components.filter(c => c.type === "COOLING").length;
+  const pue = coolingCount > 0 ? 1 + (coolingCount * 3.5) / Math.max(1, totalPower - coolingCount * 3.5) : 2.2;
 
-          left: Math.random() * 90,
+  const selectedComp = selected != null ? components.find(c => c.id === selected) : null;
 
-          top: Math.random() * 80,
-
-          size: Math.random() * 8 + 4,
-
-          speed: Math.random() * 2 + 1,
-        },
-      ]);
+  const handleCellClick = useCallback((col, row) => {
+    if (tool === "SELECT") {
+      const hit = components.find(c => {
+        const r = getComponentRect(c);
+        return col >= r.col && col < r.col + r.w && row >= r.row && row < r.row + r.h;
+      });
+      setSelected(hit ? hit.id : null);
+      return;
     }
-    return () => clearInterval(interval);
+    if (tool === "DELETE") {
+      const hit = components.find(c => {
+        const r = getComponentRect(c);
+        return col >= r.col && col < r.col + r.w && row >= r.row && row < r.row + r.h;
+      });
+      if (hit) {
+        setComponents(prev => prev.filter(c => c.id !== hit.id));
+        setSelected(null);
+      }
+      return;
+    }
+    const t = COMPONENT_TYPES[tool];
+    if (!t) return;
+    if (col + t.w > GRID_COLS || row + t.h > GRID_ROWS) return;
+    const newComp = { id: mkId(), type: tool, col, row, load: 0.5, age: 0 };
+    const overlaps = components.some(c => collides(c, newComp));
+    if (!overlaps) {
+      setComponents(prev => [...prev, newComp]);
+    }
+  }, [tool, components]);
+
+  const handleDragStart = useCallback((e, compId) => {
+    if (tool !== "SELECT") return;
+    const comp = components.find(c => c.id === compId);
+    if (!comp) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const clickCol = Math.floor(x / CELL_SIZE);
+    const clickRow = Math.floor(y / CELL_SIZE);
+    setDragging(compId);
+    setDragOffset({ dc: clickCol - comp.col, dr: clickRow - comp.row });
+    setSelected(compId);
+    e.preventDefault();
+  }, [tool, components]);
+
+  const handleDragMove = useCallback((e) => {
+    if (dragging == null) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const col = Math.floor(x / CELL_SIZE) - dragOffset.dc;
+    const row = Math.floor(y / CELL_SIZE) - dragOffset.dr;
+    const comp = components.find(c => c.id === dragging);
+    if (!comp) return;
+    const t = COMPONENT_TYPES[comp.type];
+    const nc = Math.max(0, Math.min(GRID_COLS - t.w, col));
+    const nr = Math.max(0, Math.min(GRID_ROWS - t.h, row));
+    const moved = { ...comp, col: nc, row: nr };
+    const overlaps = components.some(c => c.id !== dragging && collides(c, moved));
+    if (!overlaps) {
+      setComponents(prev => prev.map(c => c.id === dragging ? { ...c, col: nc, row: nr } : c));
+    }
+  }, [dragging, dragOffset, components]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragging(null);
   }, []);
-  useGameLoop(
-    () => {
-      const servers = serversRef.current;
-      const money = moneyRef.current;
-      const temp = tempRef.current;
-      const cooling = coolingRef.current;
-      const security = securityRef.current;
-      const clients = clientsRef.current;
-      const coolingUpgrade = purchasedUpgrades.find(
-        (u) => u.effect === "cooling",
-      );
 
-      const repairUpgrade = purchasedUpgrades.find(
-        (u) => u.effect === "repair",
-      );
-
-      const electricityUpgrade = purchasedUpgrades.find(
-        (u) => u.effect === "electricity",
-      );
-      const boostedIncome = income * selectedDC.reward;
-
-      const boostedBill = reducedBill * selectedDC.electricity;
-
-      const nextMoney = money + income - reducedBill;
-      setMoney(nextMoney);
-
-      /* REMOVE DEAD SERVERS */
-
-      setServers((prev) => prev.filter((s) => s.health > 0));
-
-      /* ECONOMY */
-
-      const { income, electricity, electricBill, nextTemperature, load } =
-        calculateEconomy({
-          servers,
-          clients,
-          cooling: (cooling + coolingBonus) * (coolingUpgrade?.value || 1),
-          temperature: temp + selectedDC.temperature * 0.02,
-        });
-
-      /* COOLING */
-
-      const { finalTemperature, usageRatio } = calculateCooling({
-        nextTemperature,
-        cooling,
-        usedCapacity,
-        totalCapacity,
-      });
-
-      /* ATTACKS */
-
-      runCyberAttack({
-        security: security + securityBonus,
-        setMoney,
-        setTemperature,
-        setMessage,
-      });
-
-      /* MONEY */
-
-      const reducedBill = electricBill * (electricityUpgrade?.value || 1);
-
-      /* TEMP */
-
-      setTemperature(finalTemperature);
-
-      /* ELECTRICITY */
-
-      setElectricity(electricity);
-
-      /* DAMAGE */
-
-      setServers((prev) =>
-        prev.map((s) => ({
-          ...s,
-          health: Math.max(0, s.health - (finalTemperature > 70 ? 2 : 0)),
-        })),
-      );
-
-      /* AUTO REPAIR */
-
-      if (engineerCount > 0) {
-        setServers((prev) =>
-          prev.map((s) => ({
-            ...s,
-            health: Math.min(
-              100,
-              s.health + engineerCount * 0.3 * (repairUpgrade?.value || 1),
-            ),
-          })),
-        );
-      }
-
-      /* CHART */
-
-      setChartData((prev) => [
-        ...prev.slice(-20),
-        {
-          time: new Date().toLocaleTimeString(),
-          money: nextMoney,
-          temperature: finalTemperature,
-        },
-      ]);
-
-      /* EVENTS */
-
-      if (Math.random() < 0.05) {
-        triggerRandomEvent();
-      }
-
-      /* GAME OVER */
-
-      if (finalTemperature >= 100) {
-        setGameOver(true);
-
-        setMessage("💥 DATA CENTER FAILED 💥");
-      }
-    },
-    1000,
-    !gameOver,
-  );
-
-  const load = servers.reduce((sum, s) => sum + s.level, 0);
-
-  /* ---------------- GAME OVER ---------------- */
-
-  if (gameOver) {
-    return (
-      <div className="h-screen bg-black text-red-500 flex flex-col items-center justify-center p-4">
-        <h1 className="text-3xl md:text-5xl font-bold mb-6 text-center">
-          💥 DATA CENTER FAILED 💥
-        </h1>
-
-        <button
-          onClick={() => {
-            localStorage.removeItem("dc-save");
-
-            window.location.reload();
-          }}
-          className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg transition-all"
-        >
-          Restart Game
-        </button>
-      </div>
-    );
-  }
-
-  /* ---------------- UI ---------------- */
+  const canvasW = GRID_COLS * CELL_SIZE;
+  const canvasH = GRID_ROWS * CELL_SIZE;
 
   return (
-    <div
-      className={`min-h-screen p-3 sm:p-4 md:p-6 overflow-x-hidden ${bgMain}`}
-    >
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
-          Data Center Simulator 🚀
-        </h1>
+    <div style={{ fontFamily: "var(--font-sans)", color: "var(--color-text-primary)", padding: "0 0 24px" }}>
+      <h2 className="sr-only">2D Data Center Simulator — place and manage server racks, cooling units, and networking equipment on a grid</h2>
 
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 500 }}>Data Center Simulator</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 2 }}>
+            Click to place • drag to move • select tool to manage
+          </div>
+        </div>
         <button
-          onClick={() => setDarkMode(!darkMode)}
-          className="bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg"
+          onClick={() => setSimRunning(r => !r)}
+          style={{ fontSize: 13, padding: "6px 14px", borderRadius: 8, border: "0.5px solid var(--color-border-secondary)", background: simRunning ? "var(--color-background-success)" : "var(--color-background-secondary)", color: simRunning ? "var(--color-text-success)" : "var(--color-text-secondary)", cursor: "pointer" }}
         >
-          {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
+          {simRunning ? "⏸ Pause" : "▶ Resume"}
         </button>
       </div>
 
-      {message && (
-        <div className="bg-red-600 p-3 rounded-lg mb-4 break-words">
-          {message}
+      {/* Alert */}
+      {alert && (
+        <div style={{ background: "var(--color-background-warning)", color: "var(--color-text-warning)", border: "0.5px solid var(--color-border-warning)", borderRadius: 8, padding: "8px 14px", fontSize: 13, marginBottom: 12 }}>
+          {alert}
         </div>
       )}
 
-      {/* CONTROLS */}
-
-      <div className="grid grid-cols-2 md:flex gap-3 mb-6">
-        <button
-          onClick={() => addServer(1)}
-          className="w-full md:w-auto bg-green-600 hover:bg-green-700 px-4 py-3 rounded-lg"
-        >
-          Basic Server
-        </button>
-
-        <button
-          onClick={() => addServer(2)}
-          className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg"
-        >
-          Advanced Server
-        </button>
-
-        <button
-          onClick={() => addServer(3)}
-          className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 px-4 py-3 rounded-lg"
-        >
-          Quantum Server
-        </button>
-
-        <button
-          onClick={mergeServers}
-          className="w-full md:w-auto bg-yellow-500 hover:bg-yellow-600 px-4 py-3 rounded-lg"
-        >
-          Merge 🔗
-        </button>
-
-        <button
-          onClick={upgradeCooling}
-          className="w-full md:w-auto bg-cyan-500 hover:bg-cyan-600 px-4 py-3 rounded-lg"
-        >
-          Cooling ❄
-        </button>
-
-        <button
-          onClick={upgradeSecurity}
-          className="w-full md:w-auto bg-red-600 hover:bg-red-700 px-4 py-3 rounded-lg"
-        >
-          Security 🛡
-        </button>
-
-        <button
-          onClick={repairServers}
-          className="w-full md:w-auto bg-orange-600 hover:bg-orange-700 px-4 py-3 rounded-lg"
-        >
-          Repair 🔧
-        </button>
-        <button
-          onClick={() => {
-            localStorage.setItem(
-              "dc-save",
-              JSON.stringify({
-                servers,
-                money,
-                temperature,
-                cooling,
-                security,
-                electricity,
-                clients,
-                employees,
-                purchasedUpgrades,
-                darkMode,
-                chartData,
-                eventLog,
-              }),
-            );
-
-            setMessage("💾 Game Saved");
-          }}
-          className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg"
-        >
-          Save 💾
-        </button>
-        <button
-          onClick={() => {
-            localStorage.removeItem("dc-save");
-
-            window.location.reload();
-          }}
-          className="w-full md:w-auto bg-gray-700 hover:bg-gray-800 px-4 py-3 rounded-lg"
-        >
-          Reset 🗑
-        </button>
+      {/* Metrics row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 14 }}>
+        {[
+          { label: "Total Power", value: `${totalPower.toFixed(1)} kW` },
+          { label: "Avg Utilisation", value: `${(avgLoad * 100).toFixed(0)}%`, warn: avgLoad > 0.8 },
+          { label: "PUE", value: pue.toFixed(2), warn: pue > 1.8 },
+          { label: "Components", value: components.length },
+          { label: "Servers", value: serverCount },
+          { label: "Cooling Units", value: coolingCount },
+        ].map(m => (
+          <div key={m.label} style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: "10px 14px" }}>
+            <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 4 }}>{m.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: m.warn ? "var(--color-text-warning)" : "var(--color-text-primary)" }}>{m.value}</div>
+          </div>
+        ))}
       </div>
-      {/* DATACENTER SELECT */}
 
-      <div className={`${cardTheme} p-4 rounded-xl mb-6`}>
-        <h2 className="text-2xl mb-4">Datacenter Region</h2>
-
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {DATACENTERS.map((dc) => (
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+        {TOOLS.map(t => {
+          const ct = COMPONENT_TYPES[t];
+          const isActive = tool === t;
+          return (
             <button
-              key={dc.id}
-              onClick={() => setSelectedDC(dc)}
-              className={`p-4 rounded-xl transition-all ${
-                selectedDC.id === dc.id
-                  ? "bg-cyan-600 scale-105"
-                  : "bg-gray-700 hover:bg-gray-600"
-              }`}
-            >
-              <div className="text-3xl">{dc.emoji}</div>
-
-              <p className="font-bold mt-2">{dc.name}</p>
-
-              <p className="text-sm">⚡ x{dc.electricity}</p>
-
-              <p className="text-sm">💰 x{dc.reward}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* MAIN GRID */}
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
-        {/* SERVER ROOM */}
-        {/* NETWORK TRAFFIC */}
-
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
-          {packets.map((packet) => (
-            <div
-              key={packet.id}
-              className="absolute rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee] animate-pulse"
+              key={t}
+              onClick={() => { setTool(t); setSelected(null); }}
+              title={ct ? ct.desc : t === "DELETE" ? "Remove component" : "Select / drag components"}
               style={{
-                left: `${packet.left}%`,
-                top: `${packet.top}%`,
-                width: `${packet.size}px`,
-                height: `${packet.size}px`,
-                transition: `all ${packet.speed}s linear`,
+                padding: "6px 12px", fontSize: 12, borderRadius: 8,
+                border: isActive ? `2px solid var(--color-border-info)` : "0.5px solid var(--color-border-secondary)",
+                background: isActive ? "var(--color-background-info)" : "var(--color-background-primary)",
+                color: isActive ? "var(--color-text-info)" : "var(--color-text-secondary)",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 6
               }}
-            />
-          ))}
-        </div>
-        <div
-          className={`xl:col-span-2 ${cardTheme} p-4 md:p-6 rounded-xl relative overflow-hidden min-h-[400px]`}
-        >
-          <h2 className="text-xl md:text-2xl mb-4">Server Room</h2>
-
-          {/* CABLES */}
-
-          <div className="absolute inset-0 pointer-events-none z-0">
-            <svg className="w-full h-full">
-              {servers.map((_, i) => {
-                if (i === 0) return null;
-
-                const col = i % 6;
-                const row = Math.floor(i / 6);
-
-                return (
-                  <line
-                    key={i}
-                    x1={col * 150 - 80}
-                    y1={row * 190 + 90}
-                    x2={col * 150 + 40}
-                    y2={row * 190 + 90}
-                    stroke="#00ffff"
-                    strokeWidth="4"
-                    strokeDasharray="8 6"
-                    className="animate-pulse"
-                  />
-                );
-              })}
-            </svg>
-          </div>
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-          {/* SERVERS */}
-
-          <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-            {servers.map((server) => (
-              <ServerRack key={server.id} server={server} />
-            ))}
-          </div>
-        </div>
-
-        {/* DASHBOARD */}
-
-        <div
-          className={`${cardTheme} p-4 md:p-6 rounded-xl space-y-3 h-fit sticky top-4`}
-        >
-          <h2 className="text-xl md:text-2xl mb-4">Dashboard</h2>
-
-          <p>💰 Money: ${money.toFixed(0)}</p>
-
-          <p>
-            🌡 Temperature:
-            {temperature.toFixed(1)}°C
-          </p>
-
-          <p>
-            📡 Capacity:
-            {usedCapacity}/{totalCapacity}
-          </p>
-
-          <p>🖥 Servers: {servers.length}</p>
-
-          <p>🔌 Load: {load}</p>
-
-          <p>
-            ⚡ Electricity:
-            {electricity}
-          </p>
-
-          <p>❄ Cooling: {cooling}</p>
-
-          <p>🛡 Security: {security}</p>
-
-          <p>🌐 Clients: {clients.length}</p>
-
-          <p>👨‍🔧 Employees: {employees.length}</p>
-        </div>
-      </div>
-
-      {/* CLIENTS */}
-
-      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
-        <h2 className="text-xl md:text-2xl mb-4">Hosting Clients</h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {availableClients.map((client, index) => (
-            <div key={index} className={`${innerCardTheme} p-4 rounded-xl`}>
-              <p className="font-bold text-lg">{client.name}</p>
-
-              <p>Uses {client.bandwidth} TB</p>
-
-              <p>+${client.reward}/sec</p>
-
-              <button
-                onClick={() => acceptClient(client)}
-                className="mt-3 bg-purple-600 hover:bg-purple-700 px-4 py-3 rounded-lg w-full"
-              >
-                Host Client
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* EMPLOYEES */}
-
-      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
-        <h2 className="text-xl md:text-2xl mb-4">Employees</h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {EMPLOYEES.map((employee) => (
-            <div
-              key={employee.id}
-              className={`${innerCardTheme} p-4 rounded-xl`}
             >
-              <p className="font-bold text-lg">
-                {employee.emoji} {employee.name}
-              </p>
-
-              <p className="text-gray-300">Salary: ${employee.salary}</p>
-
-              <p className="text-cyan-300 mt-1">Effect: {employee.effect}</p>
-
-              <button
-                onClick={() => hireEmployee(employee)}
-                className="mt-3 bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded-lg w-full transition-all"
-              >
-                Hire
-              </button>
-            </div>
-          ))}
+              {ct ? <span>{ct.icon}</span> : t === "DELETE" ? "🗑" : "↖"}
+              <span style={{ fontWeight: isActive ? 500 : 400 }}>{ct ? ct.label : t === "DELETE" ? "Delete" : "Select"}</span>
+            </button>
+          );
+        })}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+          <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+            <input type="checkbox" checked={showHeat} onChange={e => setShowHeat(e.target.checked)} />
+            Heat map
+          </label>
+          <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+            <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} />
+            Grid
+          </label>
         </div>
       </div>
-      {/* UPGRADES */}
 
-      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
-        <h2 className="text-2xl mb-4">Upgrade Tree</h2>
+      {/* Main canvas + sidebar */}
+      <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+        {/* Grid canvas */}
+        <div
+          ref={canvasRef}
+          style={{
+            position: "relative", width: canvasW, height: canvasH,
+            background: "var(--color-background-secondary)", borderRadius: 8,
+            border: "0.5px solid var(--color-border-tertiary)", overflow: "hidden",
+            cursor: tool === "DELETE" ? "crosshair" : tool === "SELECT" ? (dragging ? "grabbing" : "default") : "cell",
+            flexShrink: 0, userSelect: "none"
+          }}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
+        >
+          {/* Heat map layer */}
+          {showHeat && Array.from({ length: GRID_ROWS }, (_, r) =>
+            Array.from({ length: GRID_COLS }, (_, c) => {
+              const h = heatMap[`${c},${r}`] || 0;
+              if (h < 0.04) return null;
+              return (
+                <div key={`h${c},${r}`} style={{
+                  position: "absolute",
+                  left: c * CELL_SIZE, top: r * CELL_SIZE,
+                  width: CELL_SIZE, height: CELL_SIZE,
+                  background: heatToColor(h),
+                  opacity: h * 0.55,
+                  pointerEvents: "none"
+                }} />
+              );
+            })
+          )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {UPGRADES.map((upgrade) => {
-            const purchased = purchasedUpgrades.some(
-              (u) => u.id === upgrade.id,
-            );
+          {/* Grid lines */}
+          {showGrid && (
+            <svg style={{ position: "absolute", top: 0, left: 0, width: canvasW, height: canvasH, pointerEvents: "none" }}>
+              {Array.from({ length: GRID_COLS + 1 }, (_, i) => (
+                <line key={`vg${i}`} x1={i * CELL_SIZE} y1={0} x2={i * CELL_SIZE} y2={canvasH}
+                  stroke="var(--color-border-tertiary)" strokeWidth="0.5" />
+              ))}
+              {Array.from({ length: GRID_ROWS + 1 }, (_, i) => (
+                <line key={`hg${i}`} x1={0} y1={i * CELL_SIZE} x2={canvasW} y2={i * CELL_SIZE}
+                  stroke="var(--color-border-tertiary)" strokeWidth="0.5" />
+              ))}
+            </svg>
+          )}
 
+          {/* Click overlay */}
+          {Array.from({ length: GRID_ROWS }, (_, r) =>
+            Array.from({ length: GRID_COLS }, (_, c) => (
+              <div key={`cell${c},${r}`}
+                style={{ position: "absolute", left: c * CELL_SIZE, top: r * CELL_SIZE, width: CELL_SIZE, height: CELL_SIZE }}
+                onClick={() => handleCellClick(c, r)}
+              />
+            ))
+          )}
+
+          {/* Components */}
+          {components.map(comp => {
+            const ct = COMPONENT_TYPES[comp.type];
+            const isSelected = selected === comp.id;
+            const isDragged = dragging === comp.id;
+            const loadColor = comp.load > 0.85 ? "#E24B4A" : comp.load > 0.65 ? "#EF9F27" : "#1D9E75";
             return (
               <div
-                key={upgrade.id}
-                className={`p-4 rounded-xl ${
-                  purchased ? "bg-green-700 text-white" : innerCardTheme
-                }`}
+                key={comp.id}
+                onMouseDown={e => handleDragStart(e, comp.id)}
+                style={{
+                  position: "absolute",
+                  left: comp.col * CELL_SIZE + 2,
+                  top: comp.row * CELL_SIZE + 2,
+                  width: ct.w * CELL_SIZE - 4,
+                  height: ct.h * CELL_SIZE - 4,
+                  background: ct.color + "22",
+                  border: isSelected ? `2px solid ${ct.color}` : `1px solid ${ct.color}66`,
+                  borderRadius: 6,
+                  cursor: tool === "SELECT" ? (isDragged ? "grabbing" : "grab") : "inherit",
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  boxShadow: isSelected ? `0 0 0 2px ${ct.color}44` : "none",
+                  zIndex: isDragged ? 10 : 1,
+                  transition: isDragged ? "none" : "left 0.05s, top 0.05s",
+                  overflow: "hidden"
+                }}
               >
-                <p className="font-bold text-lg">
-                  {upgrade.emoji} {upgrade.name}
-                </p>
-
-                <p className="text-sm text-gray-300 mt-1">
-                  {upgrade.description}
-                </p>
-
-                <p className="mt-2">💰 ${upgrade.cost}</p>
-
-                <button
-                  disabled={purchased}
-                  onClick={() => buyUpgrade(upgrade)}
-                  className={`mt-3 px-4 py-2 rounded-lg w-full ${
-                    purchased
-                      ? "bg-green-500 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
-                >
-                  {purchased ? "Purchased" : "Buy Upgrade"}
-                </button>
+                <div style={{ fontSize: ct.h > 1 ? 18 : 14 }}>{ct.icon}</div>
+                {ct.h > 1 && <div style={{ fontSize: 9, color: ct.color, fontWeight: 500, textAlign: "center", lineHeight: 1.2, marginTop: 2 }}>{ct.label}</div>}
+                {/* Load bar */}
+                <div style={{ position: "absolute", bottom: 3, left: 3, right: 3, height: 3, background: "var(--color-border-tertiary)", borderRadius: 2 }}>
+                  <div style={{ height: "100%", width: `${comp.load * 100}%`, background: loadColor, borderRadius: 2, transition: "width 0.6s" }} />
+                </div>
               </div>
             );
           })}
         </div>
-      </div>
-      {/* EVENT LOG */}
 
-      <div className={`${cardTheme} p-4 md:p-6 rounded-xl mt-6`}>
-        <h2 className="text-xl md:text-2xl mb-4">Event Log</h2>
-
-        <div className="space-y-2">
-          {eventLog.map((event, index) => (
-            <div key={index} className={`${innerCardTheme} p-3 rounded-lg`}>
-              <p>{event.text}</p>
-
-              <p className="text-xs text-gray-400">{event.time}</p>
-            </div>
-          ))}
+        {/* Sidebar */}
+        <div style={{ flex: 1, minWidth: 180 }}>
+          {selectedComp ? (
+            <ComponentDetail
+              comp={selectedComp}
+              heatMap={heatMap}
+              onLoadChange={(id, v) => setComponents(prev => prev.map(c => c.id === id ? { ...c, load: v } : c))}
+              onDelete={id => { setComponents(prev => prev.filter(c => c.id !== id)); setSelected(null); }}
+            />
+          ) : (
+            <LegendPanel />
+          )}
         </div>
       </div>
 
-      {/* CHART */}
+      {/* Status bar */}
+      <div style={{ marginTop: 10, fontSize: 11, color: "var(--color-text-secondary)", display: "flex", gap: 16 }}>
+        <span>Tick: {tick}</span>
+        <span>Components: {components.length}</span>
+        <span style={{ color: avgLoad > 0.8 ? "var(--color-text-warning)" : undefined }}>
+          Avg load: {(avgLoad * 100).toFixed(0)}%
+        </span>
+        <span>Power: {totalPower.toFixed(1)} kW</span>
+        <span style={{ color: pue > 1.8 ? "var(--color-text-warning)" : "var(--color-text-success)" }}>
+          PUE: {pue.toFixed(2)} {pue <= 1.5 ? "✓ excellent" : pue <= 1.8 ? "✓ good" : "⚠ poor"}
+        </span>
+      </div>
+    </div>
+  );
+}
 
-      <div
-        className={`${cardTheme} mt-6 w-full overflow-x-auto p-3 md:p-6 rounded-xl`}
+function ComponentDetail({ comp, heatMap, onLoadChange, onDelete }) {
+  const ct = COMPONENT_TYPES[comp.type];
+  const heat = (() => {
+    let h = 0, n = 0;
+    for (let dr = 0; dr < ct.h; dr++) for (let dc = 0; dc < ct.w; dc++) {
+      h += heatMap[`${comp.col + dc},${comp.row + dr}`] || 0;
+      n++;
+    }
+    return h / Math.max(1, n);
+  })();
+  const loadColor = comp.load > 0.85 ? "var(--color-text-danger)" : comp.load > 0.65 ? "var(--color-text-warning)" : "var(--color-text-success)";
+
+  return (
+    <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 12, padding: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 8, background: ct.color + "22", border: `1px solid ${ct.color}66`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{ct.icon}</div>
+        <div>
+          <div style={{ fontWeight: 500, fontSize: 14 }}>{ct.label}</div>
+          <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>ID #{comp.id} · age {comp.age}y</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+        <Row label="Position" value={`col ${comp.col}, row ${comp.row}`} />
+        <Row label="Load" value={<span style={{ color: loadColor }}>{(comp.load * 100).toFixed(0)}%</span>} />
+        <Row label="Power draw" value={`${(ct.powerDraw * comp.load).toFixed(2)} kW`} />
+        <Row label="Heat index" value={`${(heat * 100).toFixed(0)}%`} />
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Simulated load</label>
+        <input type="range" min="5" max="99" step="1" value={Math.round(comp.load * 100)}
+          onChange={e => onLoadChange(comp.id, parseFloat(e.target.value) / 100)}
+          style={{ width: "100%" }} />
+      </div>
+
+      {comp.load > 0.85 && comp.type !== "COOLING" && (
+        <div style={{ marginTop: 10, fontSize: 11, background: "var(--color-background-danger)", color: "var(--color-text-danger)", borderRadius: 6, padding: "6px 10px" }}>
+          ⚠ High load — consider adding a CRAC cooling unit nearby
+        </div>
+      )}
+
+      <button
+        onClick={() => onDelete(comp.id)}
+        style={{ marginTop: 12, width: "100%", padding: "7px", fontSize: 12, borderRadius: 8, border: "0.5px solid var(--color-border-danger)", color: "var(--color-text-danger)", background: "transparent", cursor: "pointer" }}
       >
-        <StatsChart data={chartData} />
+        🗑 Remove component
+      </button>
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", color: "var(--color-text-secondary)" }}>
+      <span>{label}</span>
+      <span style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{value}</span>
+    </div>
+  );
+}
+
+function LegendPanel() {
+  return (
+    <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 12, padding: "16px" }}>
+      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Components</div>
+      {Object.values(COMPONENT_TYPES).map(ct => (
+        <div key={ct.id} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 6, background: ct.color + "22", border: `1px solid ${ct.color}66`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{ct.icon}</div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500 }}>{ct.label}</div>
+            <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>{ct.desc}</div>
+          </div>
+        </div>
+      ))}
+
+      <div style={{ borderTop: "0.5px solid var(--color-border-tertiary)", paddingTop: 10, marginTop: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>Load indicator</div>
+        {[["#1D9E75", "< 65% — healthy"], ["#EF9F27", "65–85% — moderate"], ["#E24B4A", "> 85% — critical"]].map(([color, label]) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 11, color: "var(--color-text-secondary)" }}>
+            <div style={{ width: 20, height: 4, borderRadius: 2, background: color }} />
+            {label}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ borderTop: "0.5px solid var(--color-border-tertiary)", paddingTop: 10, marginTop: 4 }}>
+        <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+          Select a tool → click the grid to place. Switch to <strong>Select</strong> to drag components or inspect them.
+        </div>
       </div>
     </div>
   );

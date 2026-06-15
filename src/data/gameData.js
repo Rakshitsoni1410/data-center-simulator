@@ -1,71 +1,87 @@
 // ─── CHARACTERS ───────────────────────────────────────────────
 export const CHARACTERS = [
-    { id: 'alex', name: 'Alex', role: 'Tech Lead', gender: 'male', emoji: '👨‍💻', bonus: 'server', bonusDesc: '+20% Server revenue', startBonus: { type: 'serverRev', val: 1.2 } },
-    { id: 'rohan', name: 'Rohan', role: 'Engineer', gender: 'male', emoji: '🧑‍🔬', bonus: 'cooling', bonusDesc: '-25% Cooling costs', startBonus: { type: 'coolingCost', val: 0.75 } },
-    { id: 'priya', name: 'Priya', role: 'CEO', gender: 'female', emoji: '👩‍💼', bonus: 'money', bonusDesc: '+$2000 starting funds', startBonus: { type: 'startMoney', val: 2000 } },
-    { id: 'sara', name: 'Sara', role: 'Founder', gender: 'female', emoji: '👩‍🚀', bonus: 'contract', bonusDesc: '+50% Contract value', startBonus: { type: 'contractVal', val: 1.5 } },
+    { id: 'alex', name: 'Alex', role: 'Tech Lead', gender: 'male', emoji: '👨‍💻', color: '#4499ff', bonus: 'serverRev', bonusDesc: '+20% Server Revenue', startMoney: 5000 },
+    { id: 'rohan', name: 'Rohan', role: 'Engineer', gender: 'male', emoji: '🧑‍🔬', color: '#44cc77', bonus: 'coolingCost', bonusDesc: '-25% Cooling Costs', startMoney: 5000 },
+    { id: 'priya', name: 'Priya', role: 'CEO', gender: 'female', emoji: '👩‍💼', color: '#ff66aa', bonus: 'startMoney', bonusDesc: '+$3000 Starting Funds', startMoney: 8000 },
+    { id: 'sara', name: 'Sara', role: 'Founder', gender: 'female', emoji: '👩‍🚀', color: '#bb66ff', bonus: 'contractVal', bonusDesc: '+50% Contract Value', startMoney: 5000 },
 ];
 
-// ─── BUILDING DEFINITIONS ─────────────────────────────────────
+// ─── BUILDINGS ────────────────────────────────────────────────
 export const BUILDINGS = {
-    SERVER: { label: 'Server Rack', icon: '🖥', w: 1, h: 2, cost: 500, baseCost: 500, rev: 8, power: 2.2, heat: 3, cool: 0, sec: 0, color: '#1a3f8a', accent: '#4499ff', desc: 'Core compute. Main revenue.' },
-    GPU: { label: 'GPU Cluster', icon: '🎮', w: 2, h: 2, cost: 1200, baseCost: 1200, rev: 28, power: 6.5, heat: 8, cool: 0, sec: 0, color: '#4a1080', accent: '#bb66ff', desc: 'AI/ML workloads. High revenue + heat.' },
-    STORAGE: { label: 'Storage Array', icon: '💾', w: 2, h: 1, cost: 300, baseCost: 300, rev: 3, power: 1.0, heat: 1.5, cool: 0, sec: 0, color: '#0d4020', accent: '#44cc77', desc: 'Persistent storage. Steady income.' },
-    SWITCH: { label: 'Net Switch', icon: '📡', w: 1, h: 1, cost: 200, baseCost: 200, rev: 1, power: 0.6, heat: 1, cool: 0, sec: 0, color: '#0a3030', accent: '#00ffbb', desc: 'Routes traffic. Boosts nearby servers.' },
-    COOLING: { label: 'CRAC Unit', icon: '❄️', w: 1, h: 2, cost: 800, baseCost: 800, rev: -1, power: 4.0, heat: -12, cool: 9, sec: 0, color: '#0a2050', accent: '#00aaff', desc: 'Cools servers. Essential for uptime.' },
-    UPS: { label: 'UPS', icon: '⚡', w: 1, h: 1, cost: 400, baseCost: 400, rev: 0, power: -2, heat: 0.5, cool: 0, sec: 1, color: '#3a2000', accent: '#ffd700', desc: 'Backup power. Prevents outages.' },
-    SOLAR: { label: 'Solar Panel', icon: '☀️', w: 2, h: 1, cost: 1500, baseCost: 1500, rev: 0, power: -5, heat: 0, cool: 0, sec: 0, color: '#2a2000', accent: '#ffee44', desc: 'Free clean power. Reduces PUE.' },
-    FIREWALL: { label: 'Firewall', icon: '🛡️', w: 1, h: 1, cost: 600, baseCost: 600, rev: 0, power: 0.3, heat: 0.2, cool: 0, sec: 3, color: '#3a0808', accent: '#ff4455', desc: 'Security appliance. Stops attacks.' },
+    SERVER: { label: 'Server Rack', icon: '🖥', w: 1, h: 2, cost: 500, rev: 8, power: 2.2, heat: 3, cool: 0, sec: 0, color: '#14326e', accent: '#4499ff' },
+    GPU: { label: 'GPU Cluster', icon: '🎮', w: 2, h: 2, cost: 1200, rev: 28, power: 6.5, heat: 8, cool: 0, sec: 0, color: '#360c5a', accent: '#bb66ff' },
+    STORAGE: { label: 'Storage Array', icon: '💾', w: 2, h: 1, cost: 300, rev: 3, power: 1.0, heat: 1.5, cool: 0, sec: 0, color: '#0a2816', accent: '#44cc77' },
+    SWITCH: { label: 'Net Switch', icon: '📡', w: 1, h: 1, cost: 200, rev: 1, power: 0.6, heat: 1, cool: 0, sec: 0, color: '#0a2820', accent: '#00ffbb' },
+    COOLING: { label: 'CRAC Unit', icon: '❄️', w: 1, h: 2, cost: 800, rev: -1, power: 4.0, heat: -12, cool: 9, sec: 0, color: '#0a1c3c', accent: '#00aaff' },
+    UPS: { label: 'UPS', icon: '⚡', w: 1, h: 1, cost: 400, rev: 0, power: -2, heat: 0.5, cool: 0, sec: 1, color: '#281600', accent: '#ffd700' },
+    SOLAR: { label: 'Solar Panel', icon: '☀️', w: 2, h: 1, cost: 1500, rev: 0, power: -5, heat: 0, cool: 0, sec: 0, color: '#201a00', accent: '#ffdd00' },
+    FIREWALL: { label: 'Firewall', icon: '🛡️', w: 1, h: 1, cost: 600, rev: 0, power: 0.3, heat: 0.2, cool: 0, sec: 3, color: '#280808', accent: '#ff4455' },
+    GENERATOR: { label: 'Generator', icon: '🔌', w: 2, h: 1, cost: 2000, rev: 0, power: -10, heat: 2, cool: 0, sec: 0, color: '#1a1a00', accent: '#ffaa00' },
+    HALON: { label: 'Fire Suppress', icon: '🧯', w: 1, h: 1, cost: 1200, rev: 0, power: 0.1, heat: 0, cool: 0, sec: 0, color: '#3a0808', accent: '#ff6600' },
 };
 
-// ─── UPGRADES ────────────────────────────────────────────────
-export const UPGRADES = [
-    { id: 'nvme', name: 'NVMe SSDs', cost: 2000, icon: '💿', desc: '+15% Storage revenue', req: { STORAGE: 2 }, effect: { storageRev: 1.15 } },
-    { id: 'liquid', name: 'Liquid Cooling', cost: 3500, icon: '💧', desc: '+40% Cooling efficiency', req: { COOLING: 2 }, effect: { coolingEff: 1.4 } },
-    { id: 'fiber', name: 'Fiber Network', cost: 2500, icon: '🔗', desc: '+25% all Server revenue', req: { SWITCH: 2 }, effect: { allRev: 1.25 } },
-    { id: 'ai', name: 'AI Load Balancer', cost: 4000, icon: '🤖', desc: 'Auto-optimises load', req: { GPU: 1 }, effect: { autoBalance: true } },
-    { id: 'green', name: 'Green Cert', cost: 5000, icon: '🌱', desc: '+$500/s eco bonus', req: { SOLAR: 2 }, effect: { ecoBonus: 500 } },
-    { id: 'red', name: 'Red Team Sec', cost: 3000, icon: '🔒', desc: 'Immune to DDoS attacks', req: { FIREWALL: 2 }, effect: { ddosImmune: true } },
-    { id: 'turbo', name: 'Turbo Clocks', cost: 6000, icon: '⚡', desc: '+30% GPU revenue', req: { GPU: 2 }, effect: { gpuRev: 1.3 } },
-    { id: 'backup', name: 'Geo Redundancy', cost: 8000, icon: '🌐', desc: 'Contracts pay 2x', req: { SERVER: 5 }, effect: { contractMult: 2 } },
-];
+// ─── STAFF ROLES ──────────────────────────────────────────────
+export const STAFF_ROLES = {
+    ENGINEER: { label: 'Engineer', icon: '👷', salary: 50, speed: 1.2, color: '#4499ff', skill: 'repair', desc: 'Fixes overheating servers fast' },
+    SECURITY: { label: 'Security Guard', icon: '💂', salary: 35, speed: 0.8, color: '#ff4455', skill: 'security', desc: 'Blocks DDoS & breach attempts' },
+    COOLER: { label: 'Cooling Tech', icon: '🥶', salary: 45, speed: 1.0, color: '#00aaff', skill: 'cooling', desc: '+15% CRAC unit efficiency' },
+    MANAGER: { label: 'IT Manager', icon: '🤵', salary: 80, speed: 0.9, color: '#ffd700', skill: 'boost', desc: '+10% revenue from all servers' },
+    JANITOR: { label: 'Janitor', icon: '🧹', salary: 20, speed: 1.4, color: '#44cc77', skill: 'clean', desc: 'Prevents minor equipment failure' },
+};
 
 // ─── CONTRACTS ───────────────────────────────────────────────
 export const CONTRACTS = [
-    { id: 'startup', name: 'Startup Hosting', icon: '🚀', tier: 1, reward: 800, duration: 30, req: { servers: 2, temp: 50, uptime: 0.8 }, desc: 'Host a fintech startup.' },
+    { id: 'startup', name: 'Startup Hosting', icon: '🚀', tier: 1, reward: 800, duration: 30, req: { servers: 2, temp: 50, uptime: 0.80 }, desc: 'Host a fintech startup.' },
     { id: 'ecom', name: 'E-commerce CDN', icon: '🛒', tier: 1, reward: 1200, duration: 45, req: { servers: 3, temp: 45, uptime: 0.85 }, desc: 'Power an online store.' },
-    { id: 'bank', name: 'Bank Processing', icon: '🏦', tier: 2, reward: 3000, duration: 60, req: { servers: 5, temp: 40, uptime: 0.9, sec: 5 }, desc: 'Financial transaction processing.' },
-    { id: 'ai_lab', name: 'AI Research Lab', icon: '🧬', tier: 2, reward: 4500, duration: 50, req: { gpu: 2, temp: 45, uptime: 0.85 }, desc: 'Train machine learning models.' },
-    { id: 'gov', name: 'Government Cloud', icon: '🏛️', tier: 3, reward: 8000, duration: 90, req: { servers: 8, temp: 38, uptime: 0.95, sec: 10 }, desc: 'Classified government workloads.' },
+    { id: 'bank', name: 'Bank Processing', icon: '🏦', tier: 2, reward: 3000, duration: 60, req: { servers: 5, temp: 40, uptime: 0.90, sec: 5 }, desc: 'Financial transactions.' },
+    { id: 'ai_lab', name: 'AI Research Lab', icon: '🧬', tier: 2, reward: 4500, duration: 50, req: { gpu: 2, temp: 45, uptime: 0.85 }, desc: 'Train ML models.' },
+    { id: 'gov', name: 'Government Cloud', icon: '🏛️', tier: 3, reward: 8000, duration: 90, req: { servers: 8, temp: 38, uptime: 0.95, sec: 10 }, desc: 'Classified workloads.' },
     { id: 'stream', name: 'Video Streaming', icon: '📺', tier: 2, reward: 3500, duration: 45, req: { storage: 3, temp: 42, uptime: 0.88 }, desc: 'Serve video to millions.' },
-    { id: 'crypto', name: 'Crypto Exchange', icon: '₿', tier: 3, reward: 10000, duration: 60, req: { gpu: 4, temp: 40, uptime: 0.95, sec: 8 }, desc: 'High-frequency crypto trading.' },
-    { id: 'healthcare', name: 'Healthcare Records', icon: '🏥', tier: 3, reward: 7000, duration: 75, req: { storage: 4, temp: 38, uptime: 0.98, sec: 12 }, desc: 'Store patient health records.' },
+    { id: 'crypto', name: 'Crypto Exchange', icon: '₿', tier: 3, reward: 10000, duration: 60, req: { gpu: 4, temp: 40, uptime: 0.95, sec: 8 }, desc: 'High-frequency trading.' },
+    { id: 'hospital', name: 'Healthcare Records', icon: '🏥', tier: 3, reward: 7000, duration: 75, req: { storage: 4, temp: 38, uptime: 0.98, sec: 12 }, desc: 'Patient health records.' },
+];
+
+// ─── DISASTERS ───────────────────────────────────────────────
+export const DISASTERS = [
+    { id: 'fire', name: 'Server Fire!', icon: '🔥', color: '#ff3300', duration: 15, effect: 'damage', val: 0.3, desc: 'A server rack is on fire! Deploy fire suppression!', fix: 'HALON' },
+    { id: 'flood', name: 'Cooling Leak!', icon: '💧', color: '#0088ff', duration: 20, effect: 'cooling', val: 0.5, desc: 'Coolant leak detected! Send cooling tech!', fix: 'COOLER' },
+    { id: 'ddos', name: 'DDoS Attack!', icon: '💀', color: '#ff2244', duration: 10, effect: 'revenue', val: 0.2, desc: 'Massive DDoS attack underway!', fix: 'SECURITY' },
+    { id: 'powercut', name: 'Power Outage!', icon: '⚡', color: '#ffaa00', duration: 12, effect: 'power', val: 0, desc: 'Main power grid failed! Activate UPS!', fix: 'UPS' },
+    { id: 'hack', name: 'Security Breach!', icon: '🔓', color: '#aa00ff', duration: 18, effect: 'security', val: 500, desc: 'Hackers in the system! Deploy security!', fix: 'SECURITY' },
+    { id: 'overheat', name: 'Critical Overheat!', icon: '🌡️', color: '#ff6600', duration: 14, effect: 'heat', val: 2.0, desc: 'Multiple servers overheating critically!', fix: 'COOLER' },
+];
+
+// ─── STOCK MARKET ─────────────────────────────────────────────
+export const STOCKS = [
+    { id: 'NVDA', name: 'NvidiaCorp', icon: '🎮', basePrice: 280, volatility: 0.08, sector: 'chip', color: '#76b900' },
+    { id: 'AMZN', name: 'CloudGiant', icon: '☁️', basePrice: 185, volatility: 0.05, sector: 'cloud', color: '#ff9900' },
+    { id: 'TSLA', name: 'TeslaGrid', icon: '⚡', basePrice: 240, volatility: 0.12, sector: 'energy', color: '#cc0000' },
+    { id: 'COOL', name: 'CoolTech Inc', icon: '❄️', basePrice: 45, volatility: 0.15, sector: 'cooling', color: '#00aaff' },
+    { id: 'SECR', name: 'SecureBase', icon: '🛡️', basePrice: 92, volatility: 0.06, sector: 'security', color: '#ff4455' },
 ];
 
 // ─── RANDOM EVENTS ───────────────────────────────────────────
 export const EVENTS = [
-    { id: 'new_client', msg: '🎉 New enterprise client signed! Load +20%', type: 'good', effect: 'load_up', val: 0.2 },
-    { id: 'ai_job', msg: '🤖 AI training job arrived! GPU demand up.', type: 'good', effect: 'gpu_load', val: 0.25 },
-    { id: 'peak', msg: '📈 Traffic peak hour! Revenue +30% for 10s.', type: 'good', effect: 'rev_boost', val: 1.3, duration: 10 },
-    { id: 'ddos', msg: '💀 DDoS attack! Lost funds.', type: 'bad', effect: 'lose_money', val: 500 },
-    { id: 'power_spike', msg: '⚡ Power grid spike! Load fluctuating.', type: 'warn', effect: 'load_spike', val: 0.2 },
-    { id: 'hardware', msg: '🔧 Hardware failure! Server offline briefly.', type: 'bad', effect: 'downtime', val: 0.2 },
-    { id: 'investor', msg: '💰 Investor interest! Bonus $1000.', type: 'good', effect: 'bonus_money', val: 1000 },
-    { id: 'hack', msg: '🔓 Security breach attempted! (Blocked)', type: 'warn', effect: 'sec_check', val: 0 },
-    { id: 'audit', msg: '✅ Infrastructure audit passed! Rating boost.', type: 'good', effect: 'rating_up', val: 5 },
-    { id: 'green_award', msg: '🌱 Eco award received! Green press coverage.', type: 'good', effect: 'bonus_money', val: 800 },
+    { id: 'client', msg: '🎉 New enterprise client!', type: 'good', effect: 'load_up', val: 0.20 },
+    { id: 'ai_job', msg: '🤖 AI training job arrived!', type: 'good', effect: 'gpu_load', val: 0.25 },
+    { id: 'peak', msg: '📈 Traffic peak! Rev +30% (15s)', type: 'good', effect: 'rev_boost', val: 1.3, dur: 15 },
+    { id: 'investor', msg: '💰 Investor bonus! +$1500', type: 'good', effect: 'bonus', val: 1500 },
+    { id: 'audit', msg: '✅ Audit passed! Bonus $800', type: 'good', effect: 'bonus', val: 800 },
+    { id: 'green', msg: '🌱 Eco award! +$600', type: 'good', effect: 'bonus', val: 600 },
+    { id: 'spike', msg: '⚡ Power spike! Load fluctuating', type: 'warn', effect: 'load_spike', val: 0.2 },
+    { id: 'hardware', msg: '🔧 Minor hardware fault detected', type: 'warn', effect: 'uptime', val: 0.05 },
 ];
 
-// ─── ACHIEVEMENTS ────────────────────────────────────────────
-export const ACHIEVEMENTS = [
-    { id: 'first_server', name: 'First Server', icon: '🖥', desc: 'Place your first server', check: (g) => g.comps.some(c => c.type === 'SERVER') },
-    { id: 'hot_stuff', name: 'Hot Stuff', icon: '🌡️', desc: 'Reach 60°C average temp', check: (g) => g.metrics.temp > 60 },
-    { id: 'cool_operator', name: 'Cool Operator', icon: '❄️', desc: 'Keep temp below 25°C', check: (g) => g.metrics.temp < 25 && g.comps.length > 3 },
-    { id: 'millionaire', name: 'Millionaire', icon: '💰', desc: 'Earn $1,000,000', check: (g) => g.totalEarned >= 1000000 },
-    { id: 'empire', name: 'Data Empire', icon: '🏢', desc: 'Have 10+ buildings', check: (g) => g.comps.length >= 10 },
-    { id: 'contract_king', name: 'Contract King', icon: '📋', desc: 'Complete 5 contracts', check: (g) => g.completedContracts >= 5 },
-    { id: 's_plus', name: 'S+ Rating', icon: '⭐', desc: 'Reach S+ datacenter rating', check: (g) => g.metrics.rating === 'S+' },
-    { id: 'eco_friendly', name: 'Eco Friendly', icon: '🌱', desc: 'Have 3+ solar panels', check: (g) => g.comps.filter(c => c.type === 'SOLAR').length >= 3 },
+// ─── UPGRADES ────────────────────────────────────────────────
+export const UPGRADES = [
+    { id: 'nvme', name: 'NVMe SSDs', cost: 2000, icon: '💿', desc: '+15% Storage revenue', req: { STORAGE: 2 } },
+    { id: 'liquid', name: 'Liquid Cooling', cost: 3500, icon: '💧', desc: '+40% Cooling efficiency', req: { COOLING: 2 } },
+    { id: 'fiber', name: 'Fiber Network', cost: 2500, icon: '🔗', desc: '+25% Server revenue', req: { SWITCH: 2 } },
+    { id: 'ai_bal', name: 'AI Load Balancer', cost: 4000, icon: '🤖', desc: 'Auto-optimises all load', req: { GPU: 1 } },
+    { id: 'green', name: 'Green Cert', cost: 5000, icon: '🌱', desc: '+$500/s passive eco', req: { SOLAR: 2 } },
+    { id: 'redteam', name: 'Red Team Sec', cost: 3000, icon: '🔒', desc: 'Immune to DDoS', req: { FIREWALL: 2 } },
+    { id: 'turbo', name: 'Turbo Clocks', cost: 6000, icon: '⚡', desc: '+30% GPU revenue', req: { GPU: 2 } },
+    { id: 'backup', name: 'Geo Redundancy', cost: 8000, icon: '🌐', desc: 'Contracts pay 2x', req: { SERVER: 5 } },
 ];
 
 export const GRID_COLS = 22;

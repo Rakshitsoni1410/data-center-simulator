@@ -1,1 +1,25 @@
-@import "tailwindcss";
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  image-rendering: pixelated;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050a05;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #0a0e0a; }
+::-webkit-scrollbar-thumb { background: #1e301e; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #39ff1444; }
+
+/* Remove default button styles */
+button { font-family: inherit; }
+
+/* Smooth canvas rendering override for text */
+canvas { image-rendering: pixelated; }

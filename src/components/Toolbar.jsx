@@ -6,7 +6,8 @@ const TOOLS = [
 ];
 const SECTIONS = [
   { label:'COMPUTE', tools:['SERVER','GPU','STORAGE','SWITCH'] },
-  { label:'INFRA',   tools:['COOLING','UPS','SOLAR','FIREWALL'] },
+  { label:'INFRA',   tools:['COOLING','UPS','SOLAR','GENERATOR'] },
+  { label:'SAFETY',  tools:['FIREWALL','HALON'] },
 ];
 
 export default function Toolbar({ tool, setTool }) {

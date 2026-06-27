@@ -11,6 +11,8 @@ const BCOLORS = {
   UPS: { w: "#281600", t: "#402400", tr: "#ffd700", g: "#ffee55" },
   SOLAR: { w: "#201a00", t: "#342c00", tr: "#ffdd00", g: "#ffee44" },
   FIREWALL: { w: "#280808", t: "#400e0e", tr: "#ff4455", g: "#ff6677" },
+  GENERATOR: { w: "#1a1a00", t: "#2c2c00", tr: "#ffaa00", g: "#ffcc55" },
+  HALON: { w: "#3a0808", t: "#520c0c", tr: "#ff6600", g: "#ff8833" },
 };
 
 function tempColor(t) {

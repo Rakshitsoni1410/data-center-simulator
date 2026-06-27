@@ -1,6 +1,36 @@
 import { useState, useEffect, useRef } from "react";
 import { CHARACTERS } from "../data/gameData";
 
+// ── Per-character flavor: short backstory + a few visual "tells" ──
+// This is what makes four palette-swapped sprites read as four different
+// people: a one-line bio, a distinct prop/pose, and skin-tone variety.
+const CHAR_FLAVOR = {
+  alex: {
+    bio: "Ex-AWS SRE. Burned out chasing five-nines, now chasing his own.",
+    quirk: "Drinks cold brew at 6am, still on call by habit.",
+    skinTone: "#f0b87e",
+    prop: "tablet",
+  },
+  rohan: {
+    bio: "PhD dropout, hardware tinkerer. Built his first rack from scrap.",
+    quirk: "Names every server after a Pink Floyd album.",
+    skinTone: "#caa06e",
+    prop: "wrench",
+  },
+  priya: {
+    bio: "Raised seed money on a napkin sketch. Closes deals, not laptops.",
+    quirk: "Has never personally racked a single server. Doesn't need to.",
+    skinTone: "#f2c49a",
+    prop: "phone",
+  },
+  sara: {
+    bio: "Built and sold two startups before 30. This one's for keeps.",
+    quirk: "Pitches to investors in the same hoodie she ships code in.",
+    skinTone: "#a8714a",
+    prop: "laptop",
+  },
+};
+
 // ── Pixel character SVG sprites ────────────────────────────────
 function CharSprite({ charId, size = 80 }) {
   const configs = {
@@ -8,22 +38,27 @@ function CharSprite({ charId, size = 80 }) {
       hairColor: "#3a2010",
       bodyColor: "#1a44cc",
       hairStyle: "short",
-      glasses: false,
+      glasses: true,
       tie: true,
+      pose: "neutral",
     },
     rohan: {
       hairColor: "#101030",
       bodyColor: "#1a6622",
-      hairStyle: "flat",
-      glasses: true,
+      hairStyle: "messy",
+      glasses: false,
       tie: false,
+      pose: "wide",
+      beard: true,
     },
     priya: {
-      hairColor: "#8b1a1a",
+      hairColor: "#1a0e0a",
       bodyColor: "#cc1a44",
       hairStyle: "long",
       glasses: false,
       tie: false,
+      pose: "hip",
+      earrings: true,
     },
     sara: {
       hairColor: "#111111",
@@ -31,11 +66,15 @@ function CharSprite({ charId, size = 80 }) {
       hairStyle: "bun",
       glasses: false,
       tie: false,
+      pose: "neutral",
+      hoodie: true,
     },
   };
   const cfg = configs[charId] || configs.alex;
+  const flavor = CHAR_FLAVOR[charId] || CHAR_FLAVOR.alex;
+  const skin = flavor.skinTone;
   const s = size;
-  const sc = s / 100;
+  const armSwing = cfg.pose === "wide" ? 3 : cfg.pose === "hip" ? -2 : 0;
 
   return (
     <svg
@@ -45,40 +84,207 @@ function CharSprite({ charId, size = 80 }) {
       style={{ overflow: "visible" }}
     >
       {/* Shadow */}
-      <ellipse cx="35" cy="98" rx="20" ry="3" fill="rgba(0,0,0,0.3)" />
+      <ellipse cx="35" cy="98" rx="19" ry="3" fill="rgba(0,0,0,0.35)" />
+
       {/* Legs */}
-      <rect x="22" y="70" width="10" height="25" rx="3" fill="#1a1a2a" />
-      <rect x="38" y="70" width="10" height="25" rx="3" fill="#1a1a2a" />
-      {/* Shoes */}
-      <rect x="20" y="90" width="14" height="6" rx="2" fill="#0a0a0a" />
-      <rect x="36" y="90" width="14" height="6" rx="2" fill="#0a0a0a" />
-      {/* Body */}
-      <rect x="18" y="42" width="34" height="32" rx="4" fill={cfg.bodyColor} />
-      {/* Body highlight */}
       <rect
-        x="18"
-        y="42"
-        width="34"
-        height="6"
-        rx="4"
-        fill={cfg.bodyColor + "dd"}
+        x={cfg.pose === "wide" ? 20 : 22}
+        y="70"
+        width="10"
+        height="25"
+        rx="3"
+        fill="#1a1a2a"
       />
-      <rect x="18" y="42" width="4" height="32" fill={cfg.bodyColor + "cc"} />
+      <rect
+        x={cfg.pose === "wide" ? 40 : 38}
+        y="70"
+        width="10"
+        height="25"
+        rx="3"
+        fill="#1a1a2a"
+      />
+      {/* Shoes */}
+      <rect
+        x={cfg.pose === "wide" ? 18 : 20}
+        y="90"
+        width="14"
+        height="6"
+        rx="2"
+        fill="#0a0a0a"
+      />
+      <rect
+        x={cfg.pose === "wide" ? 38 : 36}
+        y="90"
+        width="14"
+        height="6"
+        rx="2"
+        fill="#0a0a0a"
+      />
+
+      {/* Hoodie pocket / torso garment shaping (Sara) */}
+      {cfg.hoodie ? (
+        <>
+          <rect
+            x="17"
+            y="40"
+            width="36"
+            height="34"
+            rx="7"
+            fill={cfg.bodyColor}
+          />
+          <rect
+            x="17"
+            y="40"
+            width="36"
+            height="7"
+            rx="7"
+            fill={cfg.bodyColor + "ee"}
+          />
+          <rect
+            x="24"
+            y="60"
+            width="22"
+            height="11"
+            rx="3"
+            fill={cfg.bodyColor + "cc"}
+          />
+          <path
+            d="M28 41 Q35 47 42 41"
+            fill="none"
+            stroke="#0a0a0a55"
+            strokeWidth="2"
+          />
+        </>
+      ) : (
+        <>
+          <rect
+            x="18"
+            y="42"
+            width="34"
+            height="32"
+            rx="4"
+            fill={cfg.bodyColor}
+          />
+          <rect
+            x="18"
+            y="42"
+            width="34"
+            height="6"
+            rx="4"
+            fill={cfg.bodyColor + "dd"}
+          />
+          <rect
+            x="18"
+            y="42"
+            width="4"
+            height="32"
+            fill={cfg.bodyColor + "cc"}
+          />
+        </>
+      )}
+
       {/* Tie */}
       {cfg.tie && <polygon points="35,44 38,44 36.5,62 35,44" fill="#cc0000" />}
-      {/* Arms */}
-      <rect x="7" y="44" width="12" height="8" rx="3" fill={cfg.bodyColor} />
-      <rect x="51" y="44" width="12" height="8" rx="3" fill={cfg.bodyColor} />
+
+      {/* Arms (slight per-pose swing) */}
+      <rect
+        x={7 - armSwing}
+        y="44"
+        width="12"
+        height="8"
+        rx="3"
+        fill={cfg.bodyColor}
+      />
+      <rect
+        x={51 + armSwing}
+        y="44"
+        width="12"
+        height="8"
+        rx="3"
+        fill={cfg.bodyColor}
+      />
       {/* Hands */}
-      <circle cx="11" cy="56" r="5" fill="#f5c07a" />
-      <circle cx="59" cy="56" r="5" fill="#f5c07a" />
+      <circle cx={11 - armSwing} cy="56" r="5" fill={skin} />
+      <circle cx={59 + armSwing} cy="56" r="5" fill={skin} />
+
+      {/* Held prop — gives each CEO a distinct "thing they do" */}
+      {flavor.prop === "tablet" && (
+        <rect
+          x={56 + armSwing}
+          y="50"
+          width="9"
+          height="13"
+          rx="1.5"
+          fill="#0a0e1a"
+          stroke="#3a4a6a"
+          strokeWidth="1"
+        />
+      )}
+      {flavor.prop === "phone" && (
+        <rect
+          x={58 + armSwing}
+          y="50"
+          width="6"
+          height="11"
+          rx="1.5"
+          fill="#0a0a0a"
+          stroke="#444"
+          strokeWidth="0.8"
+        />
+      )}
+      {flavor.prop === "laptop" && (
+        <g transform={`translate(${2 - armSwing},0)`}>
+          <rect
+            x="2"
+            y="52"
+            width="13"
+            height="9"
+            rx="1"
+            fill="#1a1a1a"
+            stroke="#333"
+            strokeWidth="0.8"
+          />
+          <rect x="3" y="53" width="11" height="6" fill="#39ff1422" />
+        </g>
+      )}
+      {flavor.prop === "wrench" && (
+        <g transform={`translate(${1 - armSwing},3) rotate(20 8 56)`}>
+          <rect x="3" y="54" width="13" height="3.2" rx="1.4" fill="#9aa0a8" />
+          <circle
+            cx="3"
+            cy="55.6"
+            r="2.6"
+            fill="none"
+            stroke="#9aa0a8"
+            strokeWidth="1.8"
+          />
+        </g>
+      )}
+
       {/* Neck */}
-      <rect x="30" y="36" width="10" height="8" rx="2" fill="#f5c07a" />
+      <rect x="30" y="36" width="10" height="8" rx="2" fill={skin} />
       {/* Head */}
-      <rect x="18" y="12" width="34" height="30" rx="10" fill="#f5c07a" />
+      <rect x="18" y="12" width="34" height="30" rx="10" fill={skin} />
       {/* Ear */}
-      <rect x="14" y="22" width="6" height="10" rx="3" fill="#f5c07a" />
-      <rect x="50" y="22" width="6" height="10" rx="3" fill="#f5c07a" />
+      <rect x="14" y="22" width="6" height="10" rx="3" fill={skin} />
+      <rect x="50" y="22" width="6" height="10" rx="3" fill={skin} />
+      {/* Earrings (Priya) */}
+      {cfg.earrings && (
+        <>
+          <circle cx="16" cy="33" r="1.6" fill="#ffd700" />
+          <circle cx="54" cy="33" r="1.6" fill="#ffd700" />
+        </>
+      )}
+
+      {/* Beard (Rohan) */}
+      {cfg.beard && (
+        <path
+          d="M20 30 Q21 41 35 41 Q49 41 50 30 L48 36 Q35 40 22 36 Z"
+          fill={cfg.hairColor}
+          opacity="0.85"
+        />
+      )}
+
       {/* Hair */}
       {cfg.hairStyle === "short" && (
         <>
@@ -100,8 +306,20 @@ function CharSprite({ charId, size = 80 }) {
           />
         </>
       )}
-      {cfg.hairStyle === "flat" && (
-        <rect x="14" y="8" width="42" height="16" rx="8" fill={cfg.hairColor} />
+      {cfg.hairStyle === "messy" && (
+        <>
+          <rect
+            x="14"
+            y="7"
+            width="42"
+            height="17"
+            rx="8"
+            fill={cfg.hairColor}
+          />
+          <polygon points="16,10 12,4 20,9" fill={cfg.hairColor} />
+          <polygon points="34,6 31,0 39,5" fill={cfg.hairColor} />
+          <polygon points="50,9 54,3 47,8" fill={cfg.hairColor} />
+        </>
       )}
       {cfg.hairStyle === "long" && (
         <>
@@ -117,7 +335,7 @@ function CharSprite({ charId, size = 80 }) {
             x="12"
             y="12"
             width="8"
-            height="28"
+            height="32"
             rx="4"
             fill={cfg.hairColor}
           />
@@ -125,7 +343,7 @@ function CharSprite({ charId, size = 80 }) {
             x="50"
             y="12"
             width="8"
-            height="28"
+            height="32"
             rx="4"
             fill={cfg.hairColor}
           />
@@ -142,8 +360,18 @@ function CharSprite({ charId, size = 80 }) {
             fill={cfg.hairColor}
           />
           <circle cx="35" cy="5" r="8" fill={cfg.hairColor} />
+          <rect
+            x="31"
+            y="2"
+            width="8"
+            height="3"
+            rx="1.5"
+            fill={cfg.hairColor}
+            opacity="0.7"
+          />
         </>
       )}
+
       {/* Eyes */}
       <circle cx="27" cy="26" r="4" fill="white" />
       <circle cx="43" cy="26" r="4" fill="white" />
@@ -151,6 +379,7 @@ function CharSprite({ charId, size = 80 }) {
       <circle cx="44" cy="27" r="2.5" fill="#1a0a00" />
       <circle cx="28.8" cy="26.2" r="0.8" fill="white" />
       <circle cx="44.8" cy="26.2" r="0.8" fill="white" />
+
       {/* Glasses */}
       {cfg.glasses && (
         <>
@@ -184,11 +413,12 @@ function CharSprite({ charId, size = 80 }) {
           />
         </>
       )}
+
       {/* Mouth */}
       <path
         d="M28 34 Q35 39 42 34"
         fill="none"
-        stroke="#c0603a"
+        stroke="#a8543a"
         strokeWidth="1.8"
         strokeLinecap="round"
       />
@@ -562,6 +792,17 @@ export default function Onboarding({ onStart }) {
                     </div>
                     <div
                       style={{
+                        fontSize: 4.5,
+                        color: "#5a7a6a",
+                        textAlign: "center",
+                        lineHeight: 1.7,
+                        minHeight: 30,
+                      }}
+                    >
+                      {CHAR_FLAVOR[ch.id]?.bio}
+                    </div>
+                    <div
+                      style={{
                         fontSize: 5,
                         color: "#39ff1488",
                         textAlign: "center",
@@ -849,18 +1090,33 @@ export default function Onboarding({ onStart }) {
                     {company.toUpperCase()}
                   </div>
                   <div
-                    style={{ fontSize: 7, color: "#3a5a3a", marginBottom: 12 }}
+                    style={{ fontSize: 7, color: "#3a5a3a", marginBottom: 6 }}
                   >
                     CEO: {charInfo?.name} ({charInfo?.role})
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 5,
+                      color: "#39ff1499",
+                      marginBottom: 12,
+                      lineHeight: 1.8,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    "{CHAR_FLAVOR[selectedChar]?.quirk}"
                   </div>
                   {[
                     [
                       "💰",
                       "Starting Funds:",
-                      `$${charInfo?.startBonus?.type === "startMoney" ? 5000 + charInfo.startBonus.val : 5000}`,
+                      `$${charInfo?.startMoney ?? 5000}`,
                     ],
                     ["🎯", "CEO Bonus:", charInfo?.bonusDesc],
-                    ["🖥", "Starter Pack:", "2 Servers + CRAC + Switch"],
+                    [
+                      "🖥",
+                      "Starter Pack:",
+                      "2 Servers + Storage + CRAC + Switch + UPS",
+                    ],
                     ["⭐", "Goal:", "Reach S+ Rating"],
                   ].map(([icon, label, val]) => (
                     <div

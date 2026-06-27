@@ -19,8 +19,9 @@ function StatChip({ icon, label, value, warn, bad }) {
 }
 
 export default function TopBar({ gameState }) {
-  const { profile, money, metrics, speed, toggleSpeed } = gameState;
+  const { profile, money, metrics, speed, toggleSpeed, prestigeLevel, netWorth, prestigeRequirement, canPrestige, doPrestige } = gameState;
   const { rev, power, temp, pue, rating } = metrics;
+  const prestigePct = Math.min(100, (netWorth / prestigeRequirement) * 100);
 
   return (
     <div style={{
@@ -38,7 +39,7 @@ export default function TopBar({ gameState }) {
           <div style={{ fontSize:'clamp(6px,1.2vw,9px)', color:'#39ff14', letterSpacing:1, textShadow:'0 0 6px #39ff1488', lineHeight:1.4 }}>
             {profile?.company?.toUpperCase() || 'COMPANY'}
           </div>
-          <div style={{ fontSize:5, color:'#2a4a2a', marginTop:1 }}>CEO: {profile?.name || '—'}</div>
+          <div style={{ fontSize:5, color:'#2a4a2a', marginTop:1 }}>CEO: {profile?.name || '—'} {prestigeLevel > 0 && <span style={{ color:'#ffd700' }}>★{prestigeLevel}</span>}</div>
         </div>
       </div>
 
@@ -50,6 +51,21 @@ export default function TopBar({ gameState }) {
         <StatChip icon="🌡" label="TEMP"    value={`${temp.toFixed(0)}°C`} warn={temp>36} bad={temp>50} />
         <StatChip icon="📊" label="PUE"     value={pue.toFixed(2)} warn={pue>1.5} bad={pue>2} />
         <StatChip icon="⭐" label="RATING"  value={rating} bad={rating==='F'} warn={rating==='D'||rating==='C'} />
+      </div>
+
+      {/* Prestige */}
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'0 12px', borderRight:'2px solid #141e14', flexShrink:0, minWidth:130 }}>
+        <button onClick={doPrestige} disabled={!canPrestige} title="Acquire a new Data Center for a permanent revenue boost" style={{
+          padding:'5px 9px', fontFamily:"'Press Start 2P',monospace", fontSize:6, whiteSpace:'nowrap',
+          background: canPrestige ? '#1a1400' : 'transparent',
+          border:`2px solid ${canPrestige ? '#ffd700' : '#2a2a1a'}`,
+          color: canPrestige ? '#ffd700' : '#4a4a3a',
+          cursor: canPrestige ? 'pointer' : 'not-allowed',
+          boxShadow: canPrestige ? '0 0 8px #ffd70044' : 'none',
+        }}>🌟 NEW DATA CENTER</button>
+        <div style={{ width:'100%', height:4, background:'#050a05', border:'1px solid #141e14' }}>
+          <div style={{ height:'100%', width:`${prestigePct}%`, background: canPrestige ? '#ffd700' : '#3a5a3a', transition:'width .5s' }} />
+        </div>
       </div>
 
       {/* Right controls */}

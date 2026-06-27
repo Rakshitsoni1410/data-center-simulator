@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BUILDINGS, EVENTS, DISASTERS, STOCKS, UPGRADES, GRID_COLS, GRID_ROWS } from '../data/gameData';
+import { BUILDINGS, EVENTS, DISASTERS, STOCKS, UPGRADES, MILESTONES, PRESTIGE, GRID_COLS, GRID_ROWS } from '../data/gameData';
 
 let _id = 1;
 export const mkId = () => _id++;
@@ -40,7 +40,7 @@ export function buildHeatMap(comps) {
 }
 
 // ── Metrics ──────────────────────────────────────────────────
-export function calcMetrics(comps, upgrades, boosts) {
+export function calcMetrics(comps, upgrades, boosts, prestigeMult = 1) {
   const ups = new Set(upgrades);
   let rev = 0, power = 0, sec = 0;
   comps.forEach(c => {
@@ -53,15 +53,16 @@ export function calcMetrics(comps, upgrades, boosts) {
   });
   if (ups.has('green')) rev += 500;
   boosts?.forEach(b => { if (b.type === 'rev') rev *= b.val; });
+  rev *= prestigeMult;
   const hm = buildHeatMap(comps);
   const temps = Object.values(hm);
   const temp = temps.reduce((a, b) => a + b, 0) / Math.max(1, temps.length);
   const itPow = comps.filter(c => ['SERVER', 'GPU', 'STORAGE', 'SWITCH'].includes(c.type)).reduce((s, c) => s + BUILDINGS[c.type].power * c.load, 0);
   const pue = itPow > 0 ? Math.max(1, power / itPow) : 2.5;
-  const uptime = comps.length ? comps.reduce((a, c) => a + c.uptime, 0) / comps.length : 1;
-  const score = Math.min(100, rev * 1.5 + sec * 3 - Math.max(0, temp - 28) * 2 - (pue - 1) * 8 + uptime * 10);
+  const avgUptime = comps.length ? comps.reduce((a, c) => a + c.uptime, 0) / comps.length : 1;
+  const score = Math.min(100, rev * 1.5 + sec * 3 - Math.max(0, temp - 28) * 2 - (pue - 1) * 8 + avgUptime * 10);
   const rating = score > 90 ? 'S+' : score > 75 ? 'A' : score > 60 ? 'B' : score > 45 ? 'C' : score > 30 ? 'D' : 'F';
-  return { rev, power, pue, temp, sec, rating, score, uptime, heatMap: hm };
+  return { rev, power, pue, temp, sec, rating, score, avgUptime, heatMap: hm };
 }
 
 // ── Main hook ────────────────────────────────────────────────
@@ -90,6 +91,11 @@ export default function useGameState() {
   const [activeDisaster, setActiveDisaster] = useState(null);
   const [disasterTimer, setDisasterTimer] = useState(0);
   const [disasterDamage, setDisasterDamage] = useState(0);
+  const [disastersHandled, setDisastersHandled] = useState(0);
+
+  // Prestige & milestones
+  const [prestigeLevel, setPrestigeLevel] = useState(0);
+  const [achievedMilestones, setAchievedMilestones] = useState([]);
 
   // Stocks
   const [stocks, setStocks] = useState(STOCKS.map(s => ({ ...s, price: s.basePrice, owned: 0, history: [s.basePrice] })));
@@ -111,7 +117,8 @@ export default function useGameState() {
   const [log, setLog] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  const metrics = calcMetrics(comps, upgrades, boosts);
+  const prestigeMult = 1 + prestigeLevel * PRESTIGE.multiplierPerLevel;
+  const metrics = calcMetrics(comps, upgrades, boosts, prestigeMult);
 
   // ── Logging ───────────────────────────────────────────────
   const addLog = useCallback((msg, type = 'info') => {
@@ -174,11 +181,17 @@ export default function useGameState() {
     setProfile(prof);
     const startMoney = prof.bonus === 'startMoney' ? 8000 : 5000;
     setMoney(startMoney);
+    setTotalEarned(0);
     setComps([]);
     setStaff([]);
     setStaffWalkers([]);
     setActiveContracts([]);
+    setCompletedContracts(0);
     setLog([]);
+    setPrestigeLevel(0);
+    setAchievedMilestones([]);
+    setDisastersHandled(0);
+    setStockProfit(0);
     setStocks(STOCKS.map(s => ({ ...s, price: s.basePrice, owned: 0, history: [s.basePrice] })));
 
     setTimeout(() => {
@@ -198,6 +211,15 @@ export default function useGameState() {
     addLog('Tip: Hire staff to boost performance.', 'info');
     addLog('Tip: Watch the stock market for profits!', 'info');
   }, [addLog, rebuildCables]);
+
+  const handleEvent = useCallback((ev) => {
+    addLog(ev.msg, ev.type);
+    if (ev.type !== 'warn') addToast(ev.msg, ev.type === 'bad' ? 'bad' : '');
+    if (ev.effect === 'bonus') { setMoney(m => m + ev.val); spawnCoin(ev.val); }
+    if (ev.effect === 'load_up') setComps(p => p.map(c => c.type === 'SERVER' ? { ...c, load: Math.min(.99, c.load + ev.val) } : c));
+    if (ev.effect === 'gpu_load') setComps(p => p.map(c => c.type === 'GPU' ? { ...c, load: Math.min(.99, c.load + ev.val) } : c));
+    if (ev.effect === 'rev_boost') setBoosts(b => [...b, { type: 'rev', val: ev.val, rem: ev.dur || 10 }]);
+  }, [addLog, addToast, spawnCoin]);
 
   // ── Main sim tick ─────────────────────────────────────────
   useEffect(() => {
@@ -244,9 +266,43 @@ export default function useGameState() {
         return { ...s, price: newPrice, history: [...s.history.slice(-30), newPrice] };
       }));
 
-      // Disaster timer
+      // Disaster timer + auto-resolve on timeout (unhandled = damage)
       setDisasterTimer(t => {
-        if (t > 0) return t - 1;
+        if (t > 1) return t - 1;
+        if (t === 1 && activeDisaster) {
+          const dis = activeDisaster;
+          switch (dis.effect) {
+            case 'damage':
+              setMoney(m => Math.max(0, m - 800));
+              addLog(`💸 ${dis.name} went unchecked: -$800`, 'bad');
+              break;
+            case 'revenue':
+              setMoney(m => Math.max(0, m - dis.val * 1000));
+              addLog(`💸 ${dis.name} went unchecked: -$${dis.val * 1000}`, 'bad');
+              break;
+            case 'cooling':
+              setComps(prev => prev.map(c => c.type !== 'COOLING' ? { ...c, uptime: Math.max(.4, c.uptime - .15) } : c));
+              addLog(`💧 ${dis.name} damaged uptime across the floor.`, 'bad');
+              break;
+            case 'power':
+              setMoney(m => Math.max(0, m - 600));
+              addLog(`⚡ ${dis.name} caused an outage: -$600`, 'bad');
+              break;
+            case 'security':
+              setMoney(m => Math.max(0, m - dis.val));
+              addLog(`🔓 ${dis.name} cost you $${dis.val} in damages.`, 'bad');
+              break;
+            case 'heat':
+              setComps(prev => prev.map(c => ({ ...c, load: Math.min(.99, c.load + 0.1) })));
+              addLog(`🌡️ ${dis.name} pushed every system hotter.`, 'bad');
+              break;
+            default:
+              break;
+          }
+          setActiveDisaster(null);
+          setDisasterDamage(d => d + 1);
+          addToast(`⚠️ ${dis.name} resolved with damage`, 'bad');
+        }
         return 0;
       });
 
@@ -270,22 +326,28 @@ export default function useGameState() {
 
     }, 1000 / Math.max(1, speed));
     return () => clearInterval(iv);
-  }, [phase, speed, activeDisaster, addLog, addToast, spawnSmoke]);
+  }, [phase, speed, activeDisaster, addLog, addToast, spawnSmoke, handleEvent]);
 
-  // ── Disaster auto-resolve ─────────────────────────────────
-  useEffect(() => {
-    if (disasterTimer === 0 && activeDisaster) {
-      // Apply damage
-      if (activeDisaster.effect === 'damage') {
-        setMoney(m => Math.max(0, m - 800));
-        addLog(`💸 Disaster damage: -$800`, 'bad');
-      } else if (activeDisaster.effect === 'revenue') {
-        setMoney(m => Math.max(0, m - activeDisaster.val * 1000));
-      }
-      setActiveDisaster(null);
-      addLog(`⚠️ Disaster resolved (with damage).`, 'warn');
+  // ── Player-initiated disaster response ────────────────────
+  // Checks if the right building/staff exists; if so resolves cleanly + small bonus.
+  const respondToDisaster = useCallback(() => {
+    if (!activeDisaster) return;
+    const hasFixBuilding = activeDisaster.fix && comps.some(c => c.type === activeDisaster.fix);
+    const fixStaffMap = { COOLER: 'cooling', SECURITY: 'security', UPS: null, HALON: null };
+    const hasFixStaff = staff.some(s => s.skill === 'repair' || s.skill === fixStaffMap[activeDisaster.fix]);
+    if (!hasFixBuilding && !hasFixStaff) {
+      addToast(`Need a ${BUILDINGS[activeDisaster.fix]?.label || activeDisaster.fix} or right staff!`, 'warn');
+      return;
     }
-  }, [disasterTimer, activeDisaster, addLog]);
+    const bonus = 150;
+    setMoney(m => m + bonus);
+    setActiveDisaster(null);
+    setDisasterTimer(0);
+    setDisastersHandled(n => n + 1);
+    addLog(`✅ ${activeDisaster.name} handled cleanly! +$${bonus}`, 'good');
+    addToast(`✅ Disaster contained! +$${bonus}`);
+    spawnCoin(bonus);
+  }, [activeDisaster, comps, staff, addLog, addToast, spawnCoin]);
 
   // ── Earn money ───────────────────────────────────────────
   useEffect(() => {
@@ -321,15 +383,6 @@ export default function useGameState() {
     }, 1000);
     return () => clearInterval(iv);
   }, [phase, speed, metrics.rev, staff, addLog, addToast, spawnCoin]);
-
-  const handleEvent = useCallback((ev) => {
-    addLog(ev.msg, ev.type);
-    if (ev.type !== 'warn') addToast(ev.msg, ev.type === 'bad' ? 'bad' : '');
-    if (ev.effect === 'bonus') { setMoney(m => m + ev.val); spawnCoin(ev.val); }
-    if (ev.effect === 'load_up') setComps(p => p.map(c => c.type === 'SERVER' ? { ...c, load: Math.min(.99, c.load + ev.val) } : c));
-    if (ev.effect === 'gpu_load') setComps(p => p.map(c => c.type === 'GPU' ? { ...c, load: Math.min(.99, c.load + ev.val) } : c));
-    if (ev.effect === 'rev_boost') setBoosts(b => [...b, { type: 'rev', val: ev.val, rem: ev.dur || 10 }]);
-  }, [addLog, addToast, spawnCoin]);
 
   // ── Build / demolish ─────────────────────────────────────
   const tryPlace = useCallback((type, col, row) => {
@@ -403,14 +456,6 @@ export default function useGameState() {
     addLog('Staff member fired', 'warn');
   }, [addLog]);
 
-  const resolveDisaster = useCallback(() => {
-    if (!activeDisaster) return;
-    addLog(`✅ Disaster resolved!`, 'good');
-    addToast('✅ Disaster contained!');
-    setActiveDisaster(null);
-    setDisasterTimer(0);
-  }, [activeDisaster, addLog, addToast]);
-
   // ── Stocks ───────────────────────────────────────────────
   const buyStock = useCallback((stockId, qty = 1) => {
     const s = stocks.find(x => x.id === stockId); if (!s) return;
@@ -455,15 +500,66 @@ export default function useGameState() {
     return s / Math.max(1, n);
   }, [metrics.heatMap]);
 
+  // ── Milestones ─────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'game') return;
+    const snapshot = { totalEarned, comps, completedContracts, staff, metrics, disastersHandled, stockProfit, upgrades };
+    MILESTONES.forEach(m => {
+      if (achievedMilestones.includes(m.id)) return;
+      if (m.check(snapshot)) {
+        setAchievedMilestones(p => [...p, m.id]);
+        setMoney(mo => mo + m.reward);
+        setTotalEarned(t => t + m.reward);
+        spawnCoin(m.reward);
+        addLog(`🏆 Milestone: ${m.name} — +$${m.reward}`, 'good');
+        addToast(`🏆 ${m.name}! +$${m.reward}`);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, totalEarned, comps.length, completedContracts, staff.length, metrics.rating, disastersHandled, stockProfit, upgrades.length]);
+
+  // ── Prestige (Acquire New Data Center) ─────────────────────
+  const netWorth = money + totalEarned * 0.1;
+  const prestigeRequirement = Math.floor(PRESTIGE.baseRequirement * Math.pow(PRESTIGE.requirementGrowth, prestigeLevel));
+  const canPrestige = netWorth >= prestigeRequirement;
+
+  const doPrestige = useCallback(() => {
+    if (!canPrestige) { addToast(`Need $${prestigeRequirement.toLocaleString()} net worth`, 'bad'); return; }
+    const newLevel = prestigeLevel + 1;
+    setPrestigeLevel(newLevel);
+    setMoney(profile?.bonus === 'startMoney' ? 8000 : 5000);
+    setComps([]);
+    setStaff([]);
+    setStaffWalkers([]);
+    setActiveContracts([]);
+    setUpgrades([]);
+    setBoosts([]);
+    setStocks(STOCKS.map(s => ({ ...s, price: s.basePrice, owned: 0, history: [s.basePrice] })));
+    setTimeout(() => {
+      const starter = [
+        { id: mkId(), type: 'SERVER', col: 3, row: 1, load: .6, level: 1, uptime: 1 },
+        { id: mkId(), type: 'SERVER', col: 3, row: 4, load: .5, level: 1, uptime: 1 },
+        { id: mkId(), type: 'SWITCH', col: 5, row: 2, load: .4, level: 1, uptime: 1 },
+        { id: mkId(), type: 'COOLING', col: 10, row: 1, load: .8, level: 1, uptime: 1 },
+      ];
+      setComps(starter);
+      rebuildCables(starter);
+    }, 0);
+    addLog(`🌟 Acquired Data Center #${newLevel + 1}! Permanent revenue +${(newLevel * PRESTIGE.multiplierPerLevel * 100).toFixed(0)}%`, 'good');
+    addToast(`🌟 New Data Center! Rev x${(1 + newLevel * PRESTIGE.multiplierPerLevel).toFixed(2)}`);
+  }, [canPrestige, prestigeLevel, prestigeRequirement, profile, addLog, addToast, rebuildCables]);
+
   return {
     phase, profile, comps, money, totalEarned, upgrades, boosts, activeContracts, completedContracts,
-    log, toasts, speed, tick, metrics, staff, staffWalkers, stocks, stockProfit,
-    activeDisaster, disasterTimer, cables, coins, smoke,
+    log, toasts, speed, tick, metrics, heatMap: metrics.heatMap, staff, staffWalkers, stocks, stockProfit,
+    activeDisaster, disasterTimer, disastersHandled, disasterDamage, cables, coins, smoke,
     selectedId, selectedComp: comps.find(c => c.id === selectedId) || null,
     tool, hoverCell, dragging, dragOff,
+    prestigeLevel, netWorth, prestigeRequirement, canPrestige, doPrestige,
+    achievedMilestones, milestoneList: MILESTONES,
     startGame, setTool, setSelectedId, setHoverCell, setDragging, setDragOff,
     tryPlace, demolish, upgradeComp, buyUpgrade, acceptContract,
-    hireStaff, fireStaff, resolveDisaster,
+    hireStaff, fireStaff, respondToDisaster,
     buyStock, sellStock, toggleSpeed, moveComp, getCompTemp,
     addToast, addLog,
   };

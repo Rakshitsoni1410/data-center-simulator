@@ -8,16 +8,16 @@ export const CHARACTERS = [
 
 // ─── BUILDINGS ────────────────────────────────────────────────
 export const BUILDINGS = {
-    SERVER: { label: 'Server Rack', icon: '🖥', w: 1, h: 2, cost: 500, rev: 8, power: 2.2, heat: 3, cool: 0, sec: 0, color: '#14326e', accent: '#4499ff' },
-    GPU: { label: 'GPU Cluster', icon: '🎮', w: 2, h: 2, cost: 1200, rev: 28, power: 6.5, heat: 8, cool: 0, sec: 0, color: '#360c5a', accent: '#bb66ff' },
-    STORAGE: { label: 'Storage Array', icon: '💾', w: 2, h: 1, cost: 300, rev: 3, power: 1.0, heat: 1.5, cool: 0, sec: 0, color: '#0a2816', accent: '#44cc77' },
-    SWITCH: { label: 'Net Switch', icon: '📡', w: 1, h: 1, cost: 200, rev: 1, power: 0.6, heat: 1, cool: 0, sec: 0, color: '#0a2820', accent: '#00ffbb' },
-    COOLING: { label: 'CRAC Unit', icon: '❄️', w: 1, h: 2, cost: 800, rev: -1, power: 4.0, heat: -12, cool: 9, sec: 0, color: '#0a1c3c', accent: '#00aaff' },
-    UPS: { label: 'UPS', icon: '⚡', w: 1, h: 1, cost: 400, rev: 0, power: -2, heat: 0.5, cool: 0, sec: 1, color: '#281600', accent: '#ffd700' },
-    SOLAR: { label: 'Solar Panel', icon: '☀️', w: 2, h: 1, cost: 1500, rev: 0, power: -5, heat: 0, cool: 0, sec: 0, color: '#201a00', accent: '#ffdd00' },
-    FIREWALL: { label: 'Firewall', icon: '🛡️', w: 1, h: 1, cost: 600, rev: 0, power: 0.3, heat: 0.2, cool: 0, sec: 3, color: '#280808', accent: '#ff4455' },
-    GENERATOR: { label: 'Generator', icon: '🔌', w: 2, h: 1, cost: 2000, rev: 0, power: -10, heat: 2, cool: 0, sec: 0, color: '#1a1a00', accent: '#ffaa00' },
-    HALON: { label: 'Fire Suppress', icon: '🧯', w: 1, h: 1, cost: 1200, rev: 0, power: 0.1, heat: 0, cool: 0, sec: 0, color: '#3a0808', accent: '#ff6600' },
+    SERVER: { label: 'Server Rack', icon: '🖥', w: 1, h: 2, cost: 500, rev: 8, power: 2.2, heat: 3, cool: 0, sec: 0, color: '#14326e', accent: '#4499ff', desc: 'General-purpose compute. Steady revenue, moderate heat.' },
+    GPU: { label: 'GPU Cluster', icon: '🎮', w: 2, h: 2, cost: 1200, rev: 28, power: 6.5, heat: 8, cool: 0, sec: 0, color: '#360c5a', accent: '#bb66ff', desc: 'High revenue AI/render workloads. Runs very hot.' },
+    STORAGE: { label: 'Storage Array', icon: '💾', w: 2, h: 1, cost: 300, rev: 3, power: 1.0, heat: 1.5, cool: 0, sec: 0, color: '#0a2816', accent: '#44cc77', desc: 'Cheap bulk storage. Low rev, low heat.' },
+    SWITCH: { label: 'Net Switch', icon: '📡', w: 1, h: 1, cost: 200, rev: 1, power: 0.6, heat: 1, cool: 0, sec: 0, color: '#0a2820', accent: '#00ffbb', desc: 'Links racks together for packet traffic.' },
+    COOLING: { label: 'CRAC Unit', icon: '❄️', w: 1, h: 2, cost: 800, rev: -1, power: 4.0, heat: -12, cool: 9, sec: 0, color: '#0a1c3c', accent: '#00aaff', desc: 'Cools nearby racks. Critical above 5+ servers.' },
+    UPS: { label: 'UPS', icon: '⚡', w: 1, h: 1, cost: 400, rev: 0, power: -2, heat: 0.5, cool: 0, sec: 1, color: '#281600', accent: '#ffd700', desc: 'Battery backup. Keeps systems alive during outages.' },
+    SOLAR: { label: 'Solar Panel', icon: '☀️', w: 2, h: 1, cost: 1500, rev: 0, power: -5, heat: 0, cool: 0, sec: 0, color: '#201a00', accent: '#ffdd00', desc: 'Offsets power draw with clean energy.' },
+    FIREWALL: { label: 'Firewall', icon: '🛡️', w: 1, h: 1, cost: 600, rev: 0, power: 0.3, heat: 0.2, cool: 0, sec: 3, color: '#280808', accent: '#ff4455', desc: 'Raises security rating. Required for sensitive contracts.' },
+    GENERATOR: { label: 'Generator', icon: '🔌', w: 2, h: 1, cost: 2000, rev: 0, power: -10, heat: 2, cool: 0, sec: 0, color: '#1a1a00', accent: '#ffaa00', desc: 'Backup diesel power. Big power offset during outages.' },
+    HALON: { label: 'Fire Suppress', icon: '🧯', w: 1, h: 1, cost: 1200, rev: 0, power: 0.1, heat: 0, cool: 0, sec: 0, color: '#3a0808', accent: '#ff6600', desc: 'Auto-extinguishes server fires before they spread.' },
 };
 
 // ─── STAFF ROLES ──────────────────────────────────────────────
@@ -86,3 +86,32 @@ export const UPGRADES = [
 
 export const GRID_COLS = 22;
 export const GRID_ROWS = 13;
+
+// ─── MILESTONES ───────────────────────────────────────────────
+// One-time achievements that grant a cash bonus + permanent small perk when reached.
+export const MILESTONES = [
+    { id: 'm_first_blood', name: 'First Profit', icon: '🪙', desc: 'Earn your first $1,000 total', check: s => s.totalEarned >= 1000, reward: 250 },
+    { id: 'm_grid_5', name: 'Small Operation', icon: '🏗️', desc: 'Place 5 buildings', check: s => s.comps.length >= 5, reward: 400 },
+    { id: 'm_grid_15', name: 'Growing Fast', icon: '🏢', desc: 'Place 15 buildings', check: s => s.comps.length >= 15, reward: 1500 },
+    { id: 'm_contracts_3', name: 'Reliable Partner', icon: '📋', desc: 'Complete 3 contracts', check: s => s.completedContracts >= 3, reward: 1000 },
+    { id: 'm_contracts_10', name: 'Enterprise Grade', icon: '🏛️', desc: 'Complete 10 contracts', check: s => s.completedContracts >= 10, reward: 4000 },
+    { id: 'm_staff_3', name: 'Building a Team', icon: '👥', desc: 'Hire 3 staff members', check: s => s.staff.length >= 3, reward: 600 },
+    { id: 'm_rating_a', name: 'Top Tier', icon: '⭐', desc: 'Reach an A rating or better', check: s => ['A', 'S+'].includes(s.metrics.rating), reward: 2000 },
+    { id: 'm_earned_50k', name: 'Half Century', icon: '💵', desc: 'Earn $50,000 total', check: s => s.totalEarned >= 50000, reward: 5000 },
+    { id: 'm_earned_250k', name: 'Quarter Million', icon: '💰', desc: 'Earn $250,000 total', check: s => s.totalEarned >= 250000, reward: 15000 },
+    { id: 'm_disasters_5', name: 'Crisis Manager', icon: '🚨', desc: 'Survive 5 disasters', check: s => s.disastersHandled >= 5, reward: 2000 },
+    { id: 'm_stocks_5k', name: 'Day Trader', icon: '📈', desc: 'Earn $5,000 from stock trading', check: s => s.stockProfit >= 5000, reward: 1500 },
+    { id: 'm_upgrades_4', name: 'R&D Division', icon: '🔬', desc: 'Unlock 4 upgrades', check: s => s.upgrades.length >= 4, reward: 3000 },
+];
+
+// ─── PRESTIGE ──────────────────────────────────────────────────
+// Acquiring a new data center resets the grid + money but keeps a permanent revenue
+// multiplier that scales with how much net worth you banked before resetting.
+export const PRESTIGE = {
+    // Net worth required (money + totalEarned*0.1) to unlock the first prestige.
+    baseRequirement: 20000,
+    // Each prestige level adds this much permanent revenue multiplier (additive).
+    multiplierPerLevel: 0.15,
+    // Each prestige level raises the requirement for the next one by this factor.
+    requirementGrowth: 1.8,
+};

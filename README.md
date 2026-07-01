@@ -1,97 +1,176 @@
-# 🖥️ Data Center Tycoon
+# 🖥️ 2D Data Center Simulator
 
-A React idle/tycoon game where you build and manage a data center.
+An interactive **2D Data Center Simulator** built with **React** and **Vite** for visualizing server racks, cooling systems, network switches, power consumption, and infrastructure metrics in real time.
 
-## Quick Start
-
-```bash
-npm install
-npm start
-```
-
-Then open http://localhost:3000
+![Data Center Simulator](preview.png)
 
 ---
 
-## Folder Structure
+## 🚀 Features
 
-```
-datacenter-tycoon/
+* 📦 Interactive 2D data center layout
+* 🖥️ Server rack visualization
+* ❄️ Cooling unit simulation
+* 🌐 Network switch representation
+* ⚡ Power consumption monitoring
+* 🌡️ Temperature indicators
+* 📊 Real-time infrastructure metrics
+* 🎨 Responsive and modern UI
+* ⚛️ Built with React + Vite
+* 🔄 Dynamic animations and status indicators
+
+---
+
+## 📷 Preview
+
+A visual representation of a modern data center with:
+
+* Server racks
+* Cooling systems
+* Network switches
+* Power usage statistics
+* Temperature monitoring
+* Live infrastructure status
+
+---
+
+## 🛠️ Tech Stack
+
+* **React**
+* **Vite**
+* **JavaScript**
+* **CSS3**
+* **HTML5**
+
+---
+
+## 📂 Project Structure
+
+```text
+data-center-simulator/
+│
 ├── public/
-│   └── index.html              # HTML shell
 ├── src/
-│   ├── index.js                # React entry point
-│   ├── index.css               # Global styles + animations
-│   ├── App.jsx                 # Root component
+│   ├── components/
+│   │   ├── Rack.jsx
+│   │   ├── CoolingUnit.jsx
+│   │   ├── NetworkSwitch.jsx
+│   │   ├── MetricsPanel.jsx
+│   │   └── Toolbar.jsx
 │   │
-│   ├── data/
-│   │   ├── items.js            # All 8 buildable floor items
-│   │   ├── engineers.js        # All 8 hireable engineers
-│   │   └── clients.js          # All 10 client contracts + tier colors
+│   ├── styles/
+│   │   └── simulator.css
 │   │
-│   ├── utils/
-│   │   └── gameLogic.js        # Pure functions: heat, uptime, income, upkeep
-│   │
-│   ├── hooks/
-│   │   └── useGameTick.js      # RAF game loop — runs every 4 seconds
-│   │
-│   └── components/
-│       ├── DataCenterTycoon.jsx  # Main game orchestrator (state + layout)
-│       ├── StatCard.jsx          # Top-bar stat tile
-│       ├── HeatBar.jsx           # Heat stat tile with progress bar
-│       ├── GridCell.jsx          # Single floor grid cell
-│       ├── ShopItem.jsx          # Build panel item card
-│       ├── ClientCard.jsx        # Client contract card
-│       ├── EngineerCard.jsx      # Engineer hire card
-│       └── Notification.jsx      # Toast notification banner
+│   ├── App.jsx
+│   └── main.jsx
+│
+├── index.html
 ├── package.json
+├── vite.config.js
 └── README.md
 ```
 
 ---
 
-## Game Systems
+## ⚙️ Installation
 
-### Floor
-- 8×5 grid (40 cells)
-- Place / remove items by clicking
-- 8 item types: Server rack, Cooling unit, Power supply, Security node, Network switch, Storage array, Firewall, UPS battery
+Clone the repository:
 
-### Economy (every 4s tick)
-- **Income** = servers + storage + network-per-client + client contracts + SLA bonuses
-- **Upkeep** = equipment maintenance + engineer salaries
-- **Heat** = servers × 12 minus cooling capacity; throttles income above 50%, 80%
+```bash
+git clone https://github.com/Rakshitsoni1410/data-center-simulator.git
+```
 
-### Clients (10 total, 3 tiers)
-- Tier 1: Startup, Gaming
-- Tier 2: SaaS, Analytics, Fintech, Media
-- Tier 3: Healthcare, Enterprise, Finance, AI/ML (need Priya Nair hired)
-- Clients cancel if you stop meeting their hardware requirements or SLA uptime
+Move into the project directory:
 
-### Engineers (8 total)
-| Name           | Skill      | Bonus                              |
-|----------------|------------|------------------------------------|
-| Riya Shah      | DevOps     | Auto-repairs broken servers        |
-| Marco Ruiz     | Security   | Breach chance −70%                 |
-| Asel Kim       | Networking | Network income +15%                |
-| James Obi      | SysAdmin   | Uptime +10%                        |
-| Priya Nair     | Cloud Arch | Unlocks Tier 3 enterprise clients  |
-| Tomás Vega     | Database   | Storage income +20%                |
-| Sara Lindqvist | Finance    | Upkeep −10%                        |
-| Kai Tanaka     | ML Ops     | Double income on servers past 10   |
+```bash
+cd data-center-simulator
+```
 
-### Events (each tick)
-- Security breach (steal 35% income) — prevented by Firewall or Marco
-- Server malfunction — auto-repaired by Riya or costs $80
-- Overheating warning when heat > 80%
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
 
 ---
 
-## Adding to Unity
+## 📦 Build for Production
 
-The game logic in `src/utils/gameLogic.js` maps directly to C# scripts:
-- `calcHeat()` → `HeatManager.cs`
-- `calcIncome()` → `IncomeManager.cs`
-- `calcUptime()` → `UptimeManager.cs`
-- Grid = 2D array of `CellType` enums
-- Tick loop = `InvokeRepeating("GameTick", 4f, 4f)`
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+---
+
+## 🎯 Future Enhancements
+
+* Drag-and-drop rack placement
+* Heat map visualization
+* AI-based workload simulation
+* Rack health monitoring
+* Network traffic animation
+* Power efficiency analytics
+* 3D data center mode
+* Export and reporting capabilities
+* Multi-floor layouts
+* Dark and light themes
+
+---
+
+## 🌍 Use Cases
+
+* Data center visualization
+* Educational purposes
+* Infrastructure monitoring demos
+* Server room simulation
+* Networking projects
+* Dashboard prototypes
+* React learning projects
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome.
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes.
+4. Push the branch.
+5. Open a Pull Request.
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 👨‍💻 Author
+
+**Rakshit Soni**
+
+GitHub: https://github.com/Rakshitsoni1410
+
+---
+
+⭐ If you find this project useful, consider giving it a star.
